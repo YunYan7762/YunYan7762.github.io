@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>核酸大作战 - 斗地主教学版</title>
+  
+  <!-- 外部库引入 -->
+  <script src="https://metis-online.fbcontent.cn/metis-misc/zgLDUdmazTYc0B4K6Cor.js"></script>
+  <script src="https://metis-online.fbcontent.cn/metis-misc/zZZY40t7WJC7UdQCPACm.js"></script>
+  
+  <style>
+    /* 基础样式 */
+    body {
+      font-family: 'Noto Serif SC', serif;
+      background: radial-gradient(circle at center, #2D593E 0%, #1D422B 100%);
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      color: #EBEDD4;
+      user-select: none;
+    }
+
+    /* 游戏布局 */
+    .game-layout {
+      display: grid;
+      grid-template-rows: auto 1fr 60px 240px;
+      height: 100vh;
+      width: 100vw;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    /* 1. 记牌器区域 */
+    .top-area {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px 0;
+    }
+    .counter-panel {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid #AE7645;
+      border-radius: 12px;
+      padding: 12px 20px;
+      width: 95%;
+      max-width: 1400px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      font-size: 12px;
+      max-height: none;
+      overflow: visible;
+    }
+    .counter-item {
+      background: rgba(45, 89, 62, 0.6);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(174, 118, 69, 0.3);
+    }
+
+    /* 2. 出牌区 */
+    .play-area {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      padding: 0 40px;
+    }
+    .ai-side {
+      width: 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+    .ai-box {
+      background: rgba(235, 237, 212, 0.1);
+      border: 2px solid #AE7645;
+      border-radius: 15px;
+      padding: 12px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      transition: all 0.3s;
+    }
+    .ai-box.active-turn {
+      border-color: #F59E0B;
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
+      background: rgba(245, 158, 11, 0.15);
+      transform: scale(1.05);
+    }
+    .player-info.active-turn .player-avatar {
+      border-color: #F59E0B;
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.8);
+      transform: scale(1.1);
+    }
+    .ai-avatar {
+      width: 45px;
+      height: 45px;
+      background: #AE7645;
+      border-radius: 50%;
+      margin: 0 auto 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      color: white;
+    }
+    .ai-count { font-size: 12px; font-weight: bold; color: #F59E0B; }
+
+    .reaction-pool {
+      flex-grow: 1;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 40px;
+      position: relative;
+    }
+
+    /* 中间独立大容器 */
+    .slot-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      display: none !important; /* 彻底隐藏 */
+      border: none !important; /* 强制无边框 */
+      background: transparent !important;
+    }
+
+    .slot-center.active {
+      display: flex !important;
+      border: 2px solid #AE7645 !important;
+      background: rgba(235, 237, 212, 0.08) !important;
+    }
+
+    /* 容器组样式 */
+    .container-group {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      transition: opacity 0.3s;
+    }
+    
+    .container-group.hidden {
+      visibility: hidden; /* 保持占位，防止布局抖动 */
+      pointer-events: none;
+    }
+
+    .small-slots-stack {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      height: 340px; /* 与大容器高度一致 */
+    }
+
+    /* 出牌槽位 */
+    .slot {
+      border: 2px dashed rgba(174, 118, 69, 0.4);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      background: rgba(235, 237, 212, 0.03);
+    }
+
+    .slot-small {
+      width: 117px;
+      height: 165px; /* (340 - 10) / 2 = 165 */
+      border-radius: 8px;
+    }
+
+    .slot.active { border-style: solid; background: rgba(235, 237, 212, 0.08); border-color: #AE7645; }
+    
+    /* 高亮最后一次出牌的容器 */
+    .slot.last-played {
+      border-color: #F59E0B;
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.1);
+      border-width: 3px;
+    }
+    
+    /* 调整大容器尺寸 */
+    .slot-large {
+      width: 240px;
+      height: 340px; /* 稍微增大高度 */
+    }
+
+    .slot .pai-tile { margin-left: 0; cursor: default; transform: none !important; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 90%; height: 90%; font-size: 12px; }
+    .slot-small .pai-tile { font-size: 10px; }
+
+    /* 3. 按钮栏 */
+    .button-area {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 25px;
+      z-index: 300;
+    }
+    .btn {
+      padding: 8px 45px;
+      border-radius: 30px;
+      font-weight: bold;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid #AE7645;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .btn-play { background: linear-gradient(to bottom, #F59E0B, #D97706); color: #021502; }
+    .btn-pass { background: linear-gradient(to bottom, #4B5563, #1F2937); color: white; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+    .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+
+    /* 4. 底部手牌区 */
+    .bottom-area {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      position: relative;
+      padding-left: 0;
+    }
+    .player-info {
+      position: absolute;
+      left: 40px;
+      bottom: 40px;
+      width: 110px;
+      text-align: center;
+      z-index: 200;
+    }
+    .player-avatar {
+      width: 90px;
+      height: 90px;
+      background: #DC2626;
+      border: 4px solid #EBEDD4;
+      border-radius: 50%;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: bold;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.5);
+    }
+
+    /* 牌面样式 */
+    .hand-container {
+      display: flex;
+      justify-content: center;
+      width: auto;
+      height: 220px;
+      padding-bottom: 20px;
+      margin: 0 auto;
+    }
+    .pai-tile {
+      width: 130px;
+      height: 185px;
+      background: #EBEDD4;
+      border: 2px solid #AE7645;
+      border-radius: 12px;
+      margin-left: -80px; /* 互相遮挡 */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #021502;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
+      box-shadow: -5px 0 15px rgba(0,0,0,0.4);
+      position: relative;
+      background-size: cover;
+      background-position: center;
+      z-index: 1;
+    }
+    .pai-tile:first-child { margin-left: 0; }
+    .pai-tile:hover { transform: translateY(-25px); z-index: 100 !important; }
+    .pai-tile.selected { transform: translateY(-45px); border-color: #DC2626; border-width: 3px; z-index: 50 !important; box-shadow: 0 10px 20px rgba(220, 38, 38, 0.4); }
+    
+    .tile-name { font-size: 13px; text-align: center; padding: 6px 2px; background: rgba(255,255,255,0.9); width: 100%; position: absolute; bottom: 0; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+    .tile-level { position: absolute; top: 8px; left: 8px; font-size: 20px; color: #AE7645; font-family: 'Georgia', serif; }
+    .tile-id { font-size: 10px; opacity: 0.6; margin-top: -20px; }
+
+    /* 出牌槽位 */
+    .slot {
+      border: 2px dashed rgba(174, 118, 69, 0.4);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+    }
+    .slot.active { border-style: solid; background: rgba(235, 237, 212, 0.08); border-color: #AE7645; }
+    
+    /* 高亮最后一次出牌的容器 */
+    .slot.last-played {
+      border-color: #F59E0B;
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.1);
+      border-width: 3px;
+    }
+    .slot .pai-tile { margin-left: 0; cursor: default; transform: none !important; box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+
+    /* 提示框 */
+    #toast {
+      position: fixed;
+      top: 0; /* 初始位置，将由 JS 动态计算 */
+      left: 50%;
+      transform: translateX(-50%);
+      background: #F59E0B;
+      color: #021502;
+      padding: 12px 40px;
+      border-radius: 30px;
+      font-weight: bold;
+      font-size: 20px;
+      opacity: 0;
+      z-index: 1000;
+      pointer-events: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 2px solid #021502;
+      transition: opacity 0.3s;
+    }
+
+    /* 游戏结束弹窗 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .modal-content {
+      background: #EBEDD4;
+      color: #021502;
+      padding: 40px 60px;
+      border-radius: 24px;
+      text-align: center;
+      border: 4px solid #AE7645;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      max-width: 500px;
+      width: 90%;
+    }
+    .modal-title {
+      font-size: 36px;
+      margin-bottom: 20px;
+      color: #2D593E;
+      font-weight: 900;
+    }
+    .modal-winner {
+      font-size: 24px;
+      margin-bottom: 30px;
+      color: #AE7645;
+    }
+    .btn-restart {
+      background: #F59E0B;
+      color: #021502;
+      padding: 12px 40px;
+      border-radius: 30px;
+      font-size: 20px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    }
+    .btn-restart:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
+    }
+
+    /* 响应式微调 */
+    @media (max-width: 1200px) {
+      .pai-tile { width: 90px; height: 130px; margin-left: -55px; }
+      .slot { width: 100px; height: 140px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="game-layout">
+  <!-- 1. 记牌器 -->
+  <div class="top-area">
+    <div class="counter-panel" id="tileCounter"></div>
+  </div>
+
+  <!-- 2. 出牌区 -->
+  <div class="play-area">
+    <div class="ai-side">
+      <div class="ai-box" id="ai-1">
+        <div class="ai-avatar">AI 1</div>
+        <div class="ai-count">12 张</div>
+      </div>
+      <div class="ai-box" id="ai-2">
+        <div class="ai-avatar">AI 2</div>
+        <div class="ai-count">12 张</div>
+      </div>
+    </div>
+
+    <div class="reaction-pool">
+      <!-- 中间独立大容器 (Value >= 3) -->
+      <div class="slot slot-large slot-center" id="slot-center-main"></div>
+
+      <!-- 左侧容器组 (Value 1 or 2) -->
+      <div class="container-group" id="group-left">
+        <div class="small-slots-stack">
+          <div class="slot slot-small" id="slot-L-sub1"></div>
+          <div class="slot slot-small" id="slot-L-sub2"></div>
+        </div>
+        <div class="slot slot-large" id="slot-L-main"></div>
+      </div>
+
+      <!-- 右侧容器组 (Value 1 or 2) -->
+      <div class="container-group" id="group-right">
+        <div class="slot slot-large" id="slot-R-main"></div>
+        <div class="small-slots-stack">
+          <div class="slot slot-small" id="slot-R-sub1"></div>
+          <div class="slot slot-small" id="slot-R-sub2"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ai-side">
+      <div class="ai-box" id="ai-3">
+        <div class="ai-avatar">AI 3</div>
+        <div class="ai-count">12 张</div>
+      </div>
+      <div class="ai-box" id="ai-4">
+        <div class="ai-avatar">AI 4</div>
+        <div class="ai-count">12 张</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 按钮栏 -->
+  <div class="button-area">
+    <button class="btn btn-pass" onclick="handlePass()">跳过 (PASS)</button>
+    <button class="btn btn-play" id="playBtn" onclick="handlePlay()" disabled>出牌 (PLAY)</button>
+    <button class="btn btn-pass" style="padding: 8px 20px; font-size: 14px;" onclick="location.reload()">重新开始</button>
+  </div>
+
+  <!-- 4. 手牌区 -->
+  <div class="bottom-area">
+    <div class="player-info">
+      <div class="player-avatar">YOU</div>
+      <div style="font-size: 14px; font-weight: bold; color: #F59E0B;">当前回合</div>
+    </div>
+    <div class="hand-container" id="playerHand"></div>
+  </div>
+</div>
+
+<div id="toast">DNA 复制成功！</div>
+
+<div class="modal-overlay" id="gameOverModal">
+  <div class="modal-content">
+    <div class="modal-title">游戏结束</div>
+    <div class="modal-winner" id="winnerName">赢家是：xxx</div>
+    <button class="btn-restart" onclick="location.reload()">重新开始游戏</button>
+  </div>
+</div>
+
+<script>
+  // --- 核心数据配置 ---
+  const TILE_IMAGES = {
+    '6': 'resources/grade6/核酸.png',
+    '5.H': 'resources/grade5/DNA.png',
+    '5.OH': 'resources/grade5/RNA.png',
+    '4.': 'resources/grade4/核苷酸.png',
+    '3.H': 'resources/grade3/脱氧核糖核苷酸.png',
+    '3.OH': 'resources/grade3/核糖核苷酸.png',
+    '2.H.P.A': 'resources/grade2/腺嘌呤脱氧核糖核苷酸.png',
+    '2.H.P.T': 'resources/grade2/胸腺嘧啶脱氧核糖核苷酸.png',
+    '2.H.P.C': 'resources/grade2/胞嘧啶脱氧核糖核苷酸.png',
+    '2.H.P.G': 'resources/grade2/鸟嘌呤脱氧核糖核苷酸.png',
+    '2.OH.P.A': 'resources/grade2/腺嘌呤核糖核苷酸.png',
+    '2.OH.P.U': 'resources/grade2/尿嘧啶核糖核苷酸.png',
+    '2.OH.P.C': 'resources/grade2/胞嘧啶核糖核苷酸.png',
+    '2.OH.P.G': 'resources/grade2/鸟嘌呤核糖核苷酸.png',
+    '1.H.P': 'resources/grade1/脱氧核糖-磷酸骨架.png',
+    '1.OH.P': 'resources/grade1/核糖-磷酸骨架.png',
+    '1.A': 'resources/grade0/腺嘌呤.png',
+    '1.T': 'resources/grade0/胸腺嘧啶.png',
+    '1.C': 'resources/grade0/胞嘧啶.png',
+    '1.G': 'resources/grade0/鸟嘌呤.png',
+    '1.U': 'resources/grade0/尿嘧啶.png'
+  };
+
+  const TILE_NAMES = {
+    '6': '核酸', '5.H': '脱氧核糖核酸', '5.OH': '核糖核酸', '4.': '核苷酸',
+    '3.H': '脱氧核糖核苷酸', '3.OH': '核糖核苷酸',
+    '2.H.P.A': '腺嘌呤脱氧核糖核苷酸', '2.H.P.T': '胸腺嘧啶脱氧核糖核苷酸', '2.H.P.C': '胞嘧啶核糖核苷酸', '2.H.P.G': '鸟嘌呤核糖核苷酸',
+    '2.OH.P.A': '腺嘌呤核糖核苷酸', '2.OH.P.U': '尿嘧啶核糖核苷酸', '2.OH.P.C': '胞嘧啶核糖核苷酸', '2.OH.P.G': '鸟嘌呤核糖核苷酸',
+    '1.H.P': '脱氧核糖-磷酸骨架', '1.OH.P': '核糖-磷酸骨架',
+    '1.A': '腺嘌呤', '1.T': '胸腺嘧啶', '1.C': '胞嘧啶', '1.G': '鸟嘌呤', '1.U': '尿嘧啶'
+  };
+
+  const TILE_LEVELS = {
+    '6': 5, '5.H': 4, '5.OH': 4, '4.': 4, '3.H': 3, '3.OH': 3,
+    '2.H.P.A': 2, '2.H.P.T': 2, '2.H.P.C': 2, '2.H.P.G': 2,
+    '2.OH.P.A': 2, '2.OH.P.U': 2, '2.OH.P.C': 2, '2.OH.P.G': 2,
+    '1.H.P': 1, '1.OH.P': 1, '1.A': 1, '1.T': 1, '1.C': 1, '1.G': 1, '1.U': 1
+  };
+
+  // --- 游戏状态 ---
+  let playerHand = [];
+  let aiHands = [[], [], [], []];
+  let selectedIndices = [];
+  let lastPlayedTile = null;
+  let lastPlayerIndex = -1; // 记录最后一次出牌的人
+  let passCount = 0; // 记录连续跳过的人数
+  let currentPlayerIndex = 0; // 0: Player, 1-4: AI
+  let lastPlayerSide = 'left'; // 记录上一次出牌是在哪一侧，用于交替显示配对牌
+  let tileCounts = {}; // 实时记牌器数据
+
+  // --- 初始化 ---
+  function init() {
+    dealCards();
+    renderCounter();
+    updateAICounts();
+    
+    // 随机决定首家出牌
+    currentPlayerIndex = Math.floor(Math.random() * 5);
+    updateTurnUI();
+    
+    renderHand();
+    showToast(`游戏开始！首家出牌：${currentPlayerIndex === 0 ? '您' : 'AI ' + currentPlayerIndex}`);
+    
+    if (currentPlayerIndex !== 0) {
+      setTimeout(aiTurn, 2000);
+    }
+  }
+
+  function updateTurnUI() {
+    // 清除所有高亮
+    document.querySelectorAll('.ai-box').forEach(el => el.classList.remove('active-turn'));
+    document.querySelector('.player-info').classList.remove('active-turn');
+    
+    // 设置当前高亮
+    if (currentPlayerIndex === 0) {
+      document.querySelector('.player-info').classList.add('active-turn');
+    } else {
+      const aiBox = document.getElementById(`ai-${currentPlayerIndex}`);
+      if (aiBox) aiBox.classList.add('active-turn');
+    }
+  }
+
+  function dealCards() {
+    // 初始化记牌器数据
+    tileCounts = {};
+    Object.keys(TILE_NAMES).forEach(key => {
+      tileCounts[key] = 4;
+    });
+
+    // 创建牌堆：每种牌 4 张
+    let deck = [];
+    Object.keys(TILE_NAMES).forEach(key => {
+      for (let i = 0; i < 4; i++) deck.push(key);
+    });
+
+    // 洗牌 (Fisher-Yates Shuffle)
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+
+    // 发牌：每人 12 张
+    playerHand = deck.splice(0, 12);
+    for (let i = 0; i < 4; i++) {
+      aiHands[i] = deck.splice(0, 12);
+    }
+
+    // 初始排序
+    sortHand(playerHand);
+    aiHands.forEach(h => sortHand(h));
+  }
+
+  function sortHand(hand) {
+    hand.sort((a, b) => {
+      const levelA = TILE_LEVELS[a];
+      const levelB = TILE_LEVELS[b];
+      if (levelA !== levelB) {
+        return levelB - levelA; // 按等级从大到小
+      }
+      return a.localeCompare(b); // 等级相同时按字母排序
+    });
+  }
+
+  function updateAICounts() {
+    for (let i = 1; i <= 4; i++) {
+      const el = document.querySelector(`#ai-${i} .ai-count`);
+      if (el) el.textContent = `${aiHands[i-1].length} 张`;
+    }
+  }
+
+  function renderHand() {
+    const container = document.getElementById('playerHand');
+    container.innerHTML = '';
+    
+    // 渲染前确保排序
+    sortHand(playerHand);
+
+    playerHand.forEach((tile, index) => {
+      const div = document.createElement('div');
+      div.className = `pai-tile ${selectedIndices.includes(index) ? 'selected' : ''}`;
+      div.style.zIndex = index + 1;
+      
+      if (TILE_IMAGES[tile]) {
+        div.style.backgroundImage = `url('${TILE_IMAGES[tile]}')`;
+        div.innerHTML = `
+          <div class="tile-level">${TILE_LEVELS[tile]}</div>
+          <div class="tile-name">${TILE_NAMES[tile]}</div>
+        `;
+      } else {
+        div.innerHTML = `
+          <div class="tile-level">${TILE_LEVELS[tile]}</div>
+          <div class="tile-id">${tile}</div>
+          <div class="tile-name">${TILE_NAMES[tile]}</div>
+        `;
+      }
+      
+      div.onclick = () => {
+        if (currentPlayerIndex !== 0) return;
+        toggleSelect(index);
+      };
+      container.appendChild(div);
+    });
+    checkPlayable();
+  }
+
+  function renderCounter() {
+    const counter = document.getElementById('tileCounter');
+    counter.innerHTML = '';
+    Object.keys(TILE_NAMES).forEach(key => {
+      const div = document.createElement('div');
+      div.className = 'counter-item';
+      div.id = `counter-${key.replace(/\./g, '-')}`;
+      div.innerHTML = `<b>${TILE_NAMES[key]}</b>: ${tileCounts[key]}`;
+      counter.appendChild(div);
+    });
+  }
+
+  function updateCounter(tiles) {
+    tiles.forEach(tile => {
+      if (tileCounts[tile] !== undefined && tileCounts[tile] > 0) {
+        tileCounts[tile]--;
+      }
+    });
+    renderCounter();
+  }
+
+  // --- 交互逻辑 ---
+  function toggleSelect(index) {
+    const pos = selectedIndices.indexOf(index);
+    if (pos > -1) {
+      selectedIndices.splice(pos, 1);
+    } else {
+      if (selectedIndices.length < 2) selectedIndices.push(index);
+    }
+    renderHand();
+  }
+
+  function checkPlayable() {
+    const btn = document.getElementById('playBtn');
+    if (currentPlayerIndex !== 0 || selectedIndices.length === 0) {
+      btn.disabled = true;
+      return;
+    }
+
+    // 检查选中的牌是否能大过场上的牌
+    let canPlaySelected = false;
+    if (selectedIndices.length === 1) {
+      const tile = playerHand[selectedIndices[0]];
+      if (!lastPlayedTile) {
+        canPlaySelected = true;
+      } else {
+        canPlaySelected = canBeat(tile, lastPlayedTile);
+      }
+    } else {
+      // 组合逻辑 (1级+1级)
+      const t1 = playerHand[selectedIndices[0]];
+      const t2 = playerHand[selectedIndices[1]];
+      if (canCombine(t1, t2)) {
+        const isP1 = t1.includes('.P');
+        const sugar = isP1 ? t1.split('.')[1] : t2.split('.')[1];
+        const base = isP1 ? t2.split('.')[1] : t1.split('.')[1];
+        const comboTile = `2.${sugar}.P.${base}`;
+        if (!lastPlayedTile) {
+          canPlaySelected = true;
+        } else {
+          canPlaySelected = canBeat(comboTile, lastPlayedTile);
+        }
+      }
+    }
+    
+    btn.disabled = !canPlaySelected;
+  }
+
+  // 核心规则判断
+  function canBeat(curr, prev) {
+    const cL = TILE_LEVELS[curr];
+    const pL = TILE_LEVELS[prev];
+    
+    // 新增规则：Value 为 1 的牌不能互相压制，除非是不同类型的牌（骨架 vs 碱基）
+    if (cL === 1 && pL === 1) {
+      const isCurrP = curr.includes('.P');
+      const isPrevP = prev.includes('.P');
+      // 如果一个是骨架，一个是碱基，则可以互相压制
+      return isCurrP !== isPrevP;
+    }
+
+    // 新增规则：如果场上是 Value 1
+    if (pL === 1) {
+      // 1. 任何 Value >= 3 的牌都大过它们
+      if (cL >= 3) return true;
+      // 2. Value = 2 的牌，只有包含同种成分（碱基字母或糖类型）的才能大过它们
+      if (cL === 2) {
+        const isPrevP = prev.includes('.P');
+        if (isPrevP) {
+          // 场上是骨架，检查糖是否匹配 (H 或 OH)
+          const prevSugar = prev.split('.')[1];
+          return curr.includes(prevSugar);
+        } else {
+          // 场上是碱基，检查碱基字母是否匹配 (A, T, C, G, U)
+          const prevBase = prev.split('.')[1];
+          return curr.includes(prevBase);
+        }
+      }
+      return false;
+    }
+
+    // 新增配对规则：如果数字相同，且碱基配对
+    if (cL === pL && cL >= 2 && cL <= 3) {
+      const currBase = getBaseFromTile(curr);
+      const prevBase = getBaseFromTile(prev);
+      if (currBase && prevBase && isBasePair(currBase, prevBase)) {
+        return true;
+      }
+    }
+
+    // 5级压4,3
+    if (cL === 5 && pL >= 3 && pL <= 4) return true;
+    // 4级压3
+    if (cL === 4 && pL === 3) {
+      if (curr === '5.OH' && prev === '3.H') return false; // 5.OH不能压3.H
+      return true;
+    }
+    // 3级压1,2 (需糖匹配)
+    if (cL === 3 && pL < 3) {
+      const sugar = curr.split('.')[1];
+      return prev.includes(sugar);
+    }
+    
+    return cL > pL;
+  }
+
+  // 辅助函数：从牌面提取碱基
+  function getBaseFromTile(tile) {
+    const parts = tile.split('.');
+    // 1.A -> A, 2.H.P.A -> A, 3.H -> null
+    if (parts.length === 2 && !parts[1].includes('P')) return parts[1]; // 1.A
+    if (parts.length === 4) return parts[3]; // 2.H.P.A
+    return null;
+  }
+
+  // 辅助函数：判断碱基是否配对
+  function isBasePair(b1, b2) {
+    const pairs = {
+      'A': ['T', 'U'],
+      'T': ['A'],
+      'U': ['A'],
+      'C': ['G'],
+      'G': ['C']
+    };
+    return pairs[b1] && pairs[b1].includes(b2);
+  }
+
+  function canCombine(t1, t2) {
+    if (TILE_LEVELS[t1] !== 1 || TILE_LEVELS[t2] !== 1) return false;
+    const isP1 = t1.includes('.P');
+    const isP2 = t2.includes('.P');
+    if (isP1 === isP2) return false; // 必须是一个骨架一个碱基
+    
+    // 禁忌检查
+    const sugar = isP1 ? t1.split('.')[1] : t2.split('.')[1];
+    const base = isP1 ? t2.split('.')[1] : t1.split('.')[1];
+    if (sugar === 'H' && base === 'U') return false;
+    if (sugar === 'OH' && base === 'T') return false;
+    
+    return true;
+  }
+
+  function handlePlay() {
+    if (currentPlayerIndex !== 0) return;
+    
+    let playedTile = '';
+    let isAutoCombo = false;
+    let comboTile = '';
+
+    // 检查是否触发自动合成规则
+    if (selectedIndices.length === 1 && lastPlayedTile && TILE_LEVELS[playerHand[selectedIndices[0]]] === 1 && TILE_LEVELS[lastPlayedTile] === 1) {
+      const t1 = playerHand[selectedIndices[0]];
+      const t2 = lastPlayedTile;
+      if (canCombine(t1, t2)) {
+        isAutoCombo = true;
+        const isP1 = t1.includes('.P');
+        const sugar = isP1 ? t1.split('.')[1] : t2.split('.')[1];
+        const base = isP1 ? t2.split('.')[1] : t1.split('.')[1];
+        comboTile = `2.${sugar}.P.${base}`;
+      }
+    }
+
+    if (isAutoCombo) {
+      showToast(`生化合成：${TILE_NAMES[comboTile]}`);
+      executeAutoComboPlay(comboTile, selectedIndices[0], playerHand);
+    } else if (selectedIndices.length === 2) {
+      const t1 = playerHand[selectedIndices[0]];
+      const t2 = playerHand[selectedIndices[1]];
+      const isP1 = t1.includes('.P');
+      const sugar = isP1 ? t1.split('.')[1] : t2.split('.')[1];
+      const base = isP1 ? t2.split('.')[1] : t1.split('.')[1];
+      playedTile = `2.${sugar}.P.${base}`;
+      showToast(`生化合成：${TILE_NAMES[playedTile] || '核苷酸'}`);
+      executePlay(playedTile, selectedIndices, playerHand);
+    } else {
+      playedTile = playerHand[selectedIndices[0]];
+      showToast(`打出：${TILE_NAMES[playedTile]}`);
+      executePlay(playedTile, selectedIndices, playerHand);
+    }
+
+    nextTurn();
+  }
+
+  function executeAutoComboPlay(tile, index, hand) {
+    const prevTile = lastPlayedTile;
+    const centerSlot = document.getElementById('slot-center-main');
+    const groupLeft = document.getElementById('group-left');
+    const groupRight = document.getElementById('group-right');
+
+    // 自动合成逻辑：显示两侧，隐藏中间
+    centerSlot.classList.remove('active');
+    groupLeft.classList.remove('hidden');
+    groupRight.classList.remove('hidden');
+
+    // 确定显示侧（基于上一次出牌侧）
+    const useLeftSide = (lastPlayerSide === 'left');
+    const mainSlotId = useLeftSide ? 'slot-L-main' : 'slot-R-main';
+    const sub1Id = useLeftSide ? 'slot-L-sub1' : 'slot-R-sub1';
+    const sub2Id = useLeftSide ? 'slot-L-sub2' : 'slot-R-sub2';
+
+    // 清空高亮
+    ['slot-L-main', 'slot-L-sub1', 'slot-L-sub2', 'slot-R-main', 'slot-R-sub1', 'slot-R-sub2', 'slot-center-main'].forEach(id => {
+      document.getElementById(id).classList.remove('last-played');
+    });
+
+    // 填充槽位：sub1 是场上原有的，sub2 是新打出的
+    document.getElementById(sub1Id).innerHTML = createTileHTML(prevTile);
+    document.getElementById(sub2Id).innerHTML = createTileHTML(hand[index]);
+    document.getElementById(mainSlotId).innerHTML = createTileHTML(tile);
+
+    [sub1Id, sub2Id, mainSlotId].forEach(id => {
+      document.getElementById(id).classList.add('active', 'last-played');
+    });
+
+    // 移除手牌
+    const removedTile = hand[index];
+    hand.splice(index, 1);
+    updateCounter([removedTile]);
+
+    lastPlayedTile = tile;
+    lastPlayerIndex = currentPlayerIndex;
+    passCount = 0;
+    lastPlayerSide = useLeftSide ? 'left' : 'right';
+
+    if (hand === playerHand) {
+      selectedIndices = [];
+      sortHand(playerHand);
+      renderHand();
+    } else {
+      sortHand(hand);
+      updateAICounts();
+    }
+
+    checkGameOver();
+  }
+
+  function executePlay(tile, indices, hand) {
+    const cL = TILE_LEVELS[tile];
+    const pL = lastPlayedTile ? TILE_LEVELS[lastPlayedTile] : null;
+    
+    const centerSlot = document.getElementById('slot-center-main');
+    const groupLeft = document.getElementById('group-left');
+    const groupRight = document.getElementById('group-right');
+
+    // 1. 容器切换逻辑
+    if (cL >= 3) {
+      // 显示中间大容器，隐藏两侧
+      centerSlot.classList.add('active');
+      groupLeft.classList.add('hidden');
+      groupRight.classList.add('hidden');
+      
+      // 清空所有槽位内容和高亮
+      ['slot-L-main', 'slot-L-sub1', 'slot-L-sub2', 'slot-R-main', 'slot-R-sub1', 'slot-R-sub2', 'slot-center-main'].forEach(id => {
+        const s = document.getElementById(id);
+        s.innerHTML = '';
+        s.classList.remove('last-played', 'active');
+      });
+
+      centerSlot.innerHTML = createTileHTML(tile);
+      centerSlot.classList.add('active', 'last-played');
+    } else {
+      // 显示两侧，隐藏中间
+      centerSlot.classList.remove('active');
+      groupLeft.classList.remove('hidden');
+      groupRight.classList.remove('hidden');
+
+      // 逻辑：如果是配对出牌（等级相同且碱基配对），则切换到另一侧显示
+      let useLeftSide = currentPlayerIndex <= 2;
+      let isPairBeat = false;
+      if (lastPlayedTile && cL === pL && cL >= 1 && cL <= 3) {
+        const currBase = getBaseFromTile(tile);
+        const prevBase = getBaseFromTile(lastPlayedTile);
+        if (currBase && prevBase && isBasePair(currBase, prevBase)) {
+          isPairBeat = true;
+        }
+      }
+
+      if (isPairBeat) {
+        useLeftSide = (lastPlayerSide === 'right');
+      }
+
+      const mainSlotId = useLeftSide ? 'slot-L-main' : 'slot-R-main';
+      const sub1Id = useLeftSide ? 'slot-L-sub1' : 'slot-R-sub1';
+      const sub2Id = useLeftSide ? 'slot-L-sub2' : 'slot-R-sub2';
+
+      // 清空高亮和非对比侧内容
+      ['slot-L-main', 'slot-L-sub1', 'slot-L-sub2', 'slot-R-main', 'slot-R-sub1', 'slot-R-sub2', 'slot-center-main'].forEach(id => {
+        const s = document.getElementById(id);
+        s.classList.remove('last-played');
+        if (!isPairBeat && id !== 'slot-center-main') {
+          s.innerHTML = '';
+          s.classList.remove('active');
+        }
+      });
+
+      const mainSlot = document.getElementById(mainSlotId);
+      if (indices.length === 2) {
+        const t1 = hand[indices[0]];
+        const t2 = hand[indices[1]];
+        [sub1Id, sub2Id].forEach((id, i) => {
+          const s = document.getElementById(id);
+          s.innerHTML = createTileHTML(i === 0 ? t1 : t2);
+          s.classList.add('active', 'last-played');
+        });
+        mainSlot.innerHTML = createTileHTML(tile);
+      } else {
+        // 如果是单张出牌，清空当前侧的小容器
+        document.getElementById(sub1Id).innerHTML = '';
+        document.getElementById(sub1Id).classList.remove('active');
+        document.getElementById(sub2Id).innerHTML = '';
+        document.getElementById(sub2Id).classList.remove('active');
+        mainSlot.innerHTML = createTileHTML(tile);
+      }
+      mainSlot.classList.add('active', 'last-played');
+      lastPlayerSide = useLeftSide ? 'left' : 'right';
+    }
+
+    // 移除手牌逻辑
+    const actualIndices = [...indices].sort((a,b) => b-a);
+    const removedTiles = [];
+    actualIndices.forEach(idx => {
+      removedTiles.push(hand[idx]);
+      hand.splice(idx, 1);
+    });
+    
+    // 更新记牌器：只减去实际打出的牌（如果是合成，减去原料牌）
+    updateCounter(removedTiles);
+
+    lastPlayedTile = tile;
+    lastPlayerIndex = currentPlayerIndex; // 记录谁出的牌
+    passCount = 0; // 有人出牌，重置跳过计数
+    
+    if (hand === playerHand) {
+      selectedIndices = [];
+      sortHand(playerHand); // 出牌后重新排序
+      renderHand();
+    } else {
+      sortHand(hand); // AI出牌后也排序
+      updateAICounts();
+    }
+
+    checkGameOver();
+  }
+
+  function checkGameOver() {
+    let winner = "";
+    if (playerHand.length === 0) {
+      winner = "您 (YOU)";
+    } else {
+      for (let i = 0; i < 4; i++) {
+        if (aiHands[i].length === 0) {
+          winner = `AI ${i + 1}`;
+          break;
+        }
+      }
+    }
+
+    if (winner) {
+      const modal = document.getElementById('gameOverModal');
+      const winnerText = document.getElementById('winnerName');
+      winnerText.textContent = `赢家是：${winner}`;
+      modal.style.display = 'flex';
+      
+      // 弹窗动画
+      anime({
+        targets: '.modal-content',
+        scale: [0.8, 1],
+        opacity: [0, 1],
+        duration: 600,
+        easing: 'easeOutElastic(1, .8)'
+      });
+    }
+  }
+
+  function createTileHTML(tile) {
+    const bgStyle = TILE_IMAGES[tile] ? `style="background-image: url('${TILE_IMAGES[tile]}'); background-size: cover; background-position: center;"` : '';
+    return `
+      <div class="pai-tile" ${bgStyle}>
+        <div class="tile-level">${TILE_LEVELS[tile] || 2}</div>
+        <div class="tile-name">${TILE_NAMES[tile] || '合成产物'}</div>
+      </div>
+    `;
+  }
+
+  function handlePass() {
+    if (currentPlayerIndex !== 0) return;
+    showToast("您选择了跳过");
+    passCount++;
+    nextTurn();
+  }
+
+  function executePass() {
+    lastPlayedTile = null;
+    lastPlayerSide = 'left';
+    // 清空所有槽位
+    ['slot-L-main', 'slot-L-sub1', 'slot-L-sub2', 'slot-R-main', 'slot-R-sub1', 'slot-R-sub2', 'slot-center-main'].forEach(id => {
+      const s = document.getElementById(id);
+      s.innerHTML = '';
+      s.classList.remove('active', 'last-played');
+    });
+    // 默认切回两侧显示
+    const centerSlot = document.getElementById('slot-center-main');
+    centerSlot.classList.remove('active');
+    document.getElementById('group-left').classList.remove('hidden');
+    document.getElementById('group-right').classList.remove('hidden');
+    if (currentPlayerIndex === 0) {
+      selectedIndices = [];
+      renderHand();
+    }
+  }
+
+  function nextTurn() {
+    currentPlayerIndex = (currentPlayerIndex + 1) % 5;
+    
+    // 如果连续 4 个人跳过，说明回到了最后出牌的人
+    if (passCount >= 4) {
+      executePass(); // 清空桌面
+      passCount = 0;
+    }
+
+    updateTurnUI();
+    if (currentPlayerIndex !== 0) {
+      setTimeout(aiTurn, 1500);
+    } else {
+      renderHand(); // 轮到玩家时刷新手牌状态（检查按钮可用性）
+    }
+  }
+
+  function aiTurn() {
+    const aiIdx = currentPlayerIndex - 1;
+    const hand = aiHands[aiIdx];
+    
+    // AI 逻辑：打出当前可以打出的 value 最小的牌
+    // 1. 尝试单张
+    let playableTiles = [];
+    hand.forEach((tile, index) => {
+      if (!lastPlayedTile || canBeat(tile, lastPlayedTile)) {
+        playableTiles.push({ tile, index, level: TILE_LEVELS[tile] });
+      }
+    });
+
+    // 2. 尝试组合 (如果当前没有压制牌，或者想出更小的)
+    let playableCombos = [];
+    for (let i = 0; i < hand.length; i++) {
+      for (let j = i + 1; j < hand.length; j++) {
+        if (canCombine(hand[i], hand[j])) {
+          const isP1 = hand[i].includes('.P');
+          const sugar = isP1 ? hand[i].split('.')[1] : hand[j].split('.')[1];
+          const base = isP1 ? hand[j].split('.')[1] : hand[i].split('.')[1];
+          const comboTile = `2.${sugar}.P.${base}`;
+          if (!lastPlayedTile || canBeat(comboTile, lastPlayedTile)) {
+            playableCombos.push({ tile: comboTile, indices: [i, j], level: 2 });
+          }
+        }
+      }
+    }
+
+    // 合并所有可选方案并按等级排序
+    let allOptions = [
+      ...playableTiles.map(o => ({ ...o, indices: [o.index] })),
+      ...playableCombos
+    ];
+    
+    // 排序：优先出等级（level）最小的牌
+    allOptions.sort((a, b) => a.level - b.level);
+
+    // 检查 AI 是否可以触发自动合成
+    let autoComboOption = null;
+    if (lastPlayedTile && TILE_LEVELS[lastPlayedTile] === 1) {
+      const matchIdx = hand.findIndex(t => TILE_LEVELS[t] === 1 && canCombine(t, lastPlayedTile));
+      if (matchIdx > -1) {
+        const t1 = hand[matchIdx];
+        const t2 = lastPlayedTile;
+        const isP1 = t1.includes('.P');
+        const sugar = isP1 ? t1.split('.')[1] : t2.split('.')[1];
+        const base = isP1 ? t2.split('.')[1] : t1.split('.')[1];
+        autoComboOption = { tile: `2.${sugar}.P.${base}`, index: matchIdx };
+      }
+    }
+
+    if (autoComboOption) {
+      showToast(`AI ${currentPlayerIndex} 触发自动合成：${TILE_NAMES[autoComboOption.tile]}`);
+      executeAutoComboPlay(autoComboOption.tile, autoComboOption.index, hand);
+      nextTurn();
+    } else if (allOptions.length > 0) {
+      const best = allOptions[0];
+      showToast(`AI ${currentPlayerIndex} 打出：${TILE_NAMES[best.tile] || '合成产物'}`);
+      executePlay(best.tile, best.indices, hand);
+      nextTurn();
+    } else {
+      showToast(`AI ${currentPlayerIndex} 选择了跳过`);
+      passCount++;
+      nextTurn();
+    }
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    const counter = document.getElementById('tileCounter');
+    
+    // 动态计算位置：记牌器底部下方 20px 处
+    if (counter) {
+      const rect = counter.getBoundingClientRect();
+      const targetY = rect.bottom + 20; 
+      toast.style.top = `${targetY}px`;
+    }
+
+    toast.textContent = msg;
+    
+    // 动画效果：从目标位置轻微向下弹出
+    anime({
+      targets: toast,
+      translateY: [-20, 0],
+      opacity: [0, 1],
+      duration: 500,
+      easing: 'easeOutCubic',
+      complete: () => {
+        setTimeout(() => {
+          anime({ 
+            targets: toast, 
+            opacity: 0, 
+            translateY: 10,
+            duration: 400, 
+            easing: 'linear' 
+          });
+        }, 1800);
+      }
+    });
+  }
+
+  init();
+</script>
+
+</body>
+</html>
