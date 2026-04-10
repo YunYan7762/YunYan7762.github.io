@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>同心圆旋转配对 - 纯净版</title>
+    <title>同心圆旋转配对 - 挑战增强版</title>
     <style>
         * {
             box-sizing: border-box;
@@ -48,7 +48,11 @@
             justify-content: center;
             border-radius: 50%;
             overflow: hidden;
-            /* 不使用 mix-blend-mode 或 opacity */
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .ring.dragging {
+            transition: none;
         }
 
         .ring img {
@@ -58,29 +62,9 @@
             pointer-events: none;
         }
 
-        /* 
-           层级设定：从上到下依次是 1, 2, 3
-           1.png (内环) -> z-index: 30
-           2.jpg (中环) -> z-index: 20
-           3.jpg (外环) -> z-index: 10
-        */
-        #ring-1 {
-            width: 320px;
-            height: 320px;
-            z-index: 30;
-        }
-
-        #ring-2 {
-            width: 560px;
-            height: 560px;
-            z-index: 20;
-        }
-
-        #ring-3 {
-            width: 800px;
-            height: 800px;
-            z-index: 10;
-        }
+        #ring-1 { width: 320px; height: 320px; z-index: 30; }
+        #ring-2 { width: 560px; height: 560px; z-index: 20; }
+        #ring-3 { width: 800px; height: 800px; z-index: 10; }
 
         /* 指示红线 */
         .indicator-line {
@@ -96,55 +80,76 @@
             z-index: 100;
         }
 
-        /* 碰撞检测点可视化（调试用，可根据需要隐藏） */
-        .collision-point {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: rgba(255, 0, 0, 0.5);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            display: none; /* 默认隐藏，如需查看可改为 block */
-        }
-
-        /* 右侧结果容器 */
-        .result-container {
+        /* 右侧容器外层，包含按钮 */
+        .right-panel {
             position: fixed;
             right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            width: 240px;
-            height: 400px;
-            background: #f9f9f9;
-            border: 2px solid #ddd;
-            border-radius: 12px;
-            padding: 15px;
             display: flex;
             flex-direction: column;
             gap: 10px;
+            align-items: center;
+        }
+
+        /* 模式切换按钮 */
+        .mode-switch {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px 0;
+            border: 1px solid #ddd;
+            background: #f0f0f0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        /* 右侧结果容器 */
+        .result-container {
+            width: 300px;
+            height: 500px;
+            background: #f9f9f9;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            text-align: center; /* 对称居中 */
+            text-align: center;
         }
 
         .result-title {
             font-weight: bold;
-            font-size: 16px;
+            font-size: 20px;
             color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 8px;
         }
 
         .result-list {
             flex: 1;
             overflow-y: auto;
             font-family: system-ui, sans-serif;
-            font-size: 14px;
-            color: #555;
-            line-height: 1.8;
+            font-size: 18px;
+            color: #444;
+            line-height: 1.6;
             display: flex;
             flex-direction: column;
-            justify-content: center; /* 垂直居中 */
+            justify-content: center;
             align-items: center;
         }
 
@@ -153,21 +158,54 @@
             padding: 10px 0;
         }
 
+        /* 组分名称高亮 - 蓝色 */
         .highlight-name {
             color: #2563eb;
             font-weight: 600;
         }
 
+        /* 核苷酸名称高亮 - 红色 */
+        .nucleotide-name {
+            color:#2563eb;
+            font-weight: bold;
+        }
+
+        /* 测试模式目标文本 */
+        .test-mode-target {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
         .status-success {
             color: #059669;
             font-weight: bold;
-            margin-top: 5px;
+            margin-top: 8px;
         }
 
         .status-fail {
             color: #dc2626;
             font-weight: bold;
+            margin-top: 8px;
+        }
+
+        /* 确认按钮样式 */
+        #btnConfirm {
+            width: 100%;
+            padding: 12px;
+            background: #059669;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
             margin-top: 5px;
+            display: none; /* 默认隐藏 */
+            transition: background 0.2s;
+        }
+
+        #btnConfirm:hover {
+            background: #047857;
         }
 
         .hint {
@@ -176,70 +214,129 @@
             left: 50%;
             transform: translateX(-50%);
             background: #f0f0f0;
-            padding: 8px 16px;
+            padding: 10px 20px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 16px;
             color: #333;
+            z-index: 200;
         }
     </style>
 </head>
 <body>
     <div class="turntable-container" id="turntableRoot">
-        <!-- 1.png (最上层) -->
         <div class="ring" id="ring-1">
             <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/VuZeUtWghFw9nLrQbADeyg.png" alt="图1">
         </div>
-        <!-- 2.jpg (中层) -->
         <div class="ring" id="ring-2">
             <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/LE9XM5g5fNPMCRQjDqAHxH.jpg" alt="图2">
         </div>
-        <!-- 3.jpg (最下层) -->
         <div class="ring" id="ring-3">
             <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/itU9YHhDyxQBPb8j6rTJdQ.jpg" alt="图3">
         </div>
-        
-        <!-- 指示线 -->
         <div class="indicator-line"></div>
     </div>
 
-    <div class="result-container">
-        <div class="result-title">碰撞检测结果</div>
-        <div class="result-list" id="resultList">
-            <div style="color: #999; font-size: 12px;">旋转圆环使点与红线重合...</div>
+    <div class="right-panel">
+        <div class="mode-switch">
+            <button class="mode-btn active" id="btnStudy">学习模式</button>
+            <button class="mode-btn" id="btnTest">测试模式</button>
+        </div>
+        <div class="result-container">
+            <div class="result-title" id="containerTitle">碰撞检测结果</div>
+            <div class="result-list" id="resultList">
+                <div style="color: #999; font-size: 14px;">旋转圆环使点与红线重合...</div>
+            </div>
+            <button id="btnConfirm">确认配对</button>
         </div>
     </div>
-
-    <div class="hint">鼠标拖拽对应的圆环区域进行旋转</div>
 
     <script>
         (function() {
             const root = document.getElementById('turntableRoot');
             const resultList = document.getElementById('resultList');
+            const btnStudy = document.getElementById('btnStudy');
+            const btnTest = document.getElementById('btnTest');
+            const btnConfirm = document.getElementById('btnConfirm');
+            const containerTitle = document.getElementById('containerTitle');
+
+            let currentMode = 'study'; 
+            let testTarget = null; 
+
+            const nameMap = {
+                'H': '脱氧核糖', 'OH': '核糖',
+                'A': '腺嘌呤', 'G': '鸟嘌呤', 'C': '胞嘧啶', 'T': '胸腺嘧啶', 'U': '尿嘧啶',
+                'A-H': '腺嘌呤脱氧核糖核苷酸', 'G-H': '鸟嘌呤脱氧核糖核苷酸', 'C-H': '胞嘧啶脱氧核糖核苷酸', 'T-H': '胸腺嘧啶脱氧核糖核苷酸',
+                'A-OH': '腺嘌呤核糖核苷酸', 'G-OH': '鸟嘌呤核糖核苷酸', 'C-OH': '胞嘧啶核糖核苷酸', 'U-OH': '尿嘧啶核糖核苷酸'
+            };
+
+            // 音效系统
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            function playSnapSound() {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = 'sine'; 
+                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+            }
+
+            function playGearClick() {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const bufferSize = audioCtx.sampleRate * 0.05;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 600;
+                filter.Q.value = 5;
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                noise.start();
+            }
+
             const rings = {
                 r1: { 
                     el: document.getElementById('ring-1'), 
                     angle: 0, 
                     radius: 160,
                     points: ['H', 'OH', 'H', 'OH', 'H', 'OH', 'H', 'OH'],
-                    startAngle: 90
+                    startAngle: 90,
+                    lastClickAngle: 0
                 },
                 r2: { 
                     el: document.getElementById('ring-2'), 
                     angle: 0, 
                     radius: 280,
                     points: ['C', 'G', 'A', 'C', 'T', 'U', 'G', 'A'],
-                    startAngle: 292.5
+                    startAngle: 292.5,
+                    lastClickAngle: 0
                 },
                 r3: { 
                     el: document.getElementById('ring-3'), 
                     angle: 0, 
                     radius: 400,
                     points: ['C-H', 'G-OH', 'A-H', 'C-OH', 'T-H', 'U-OH', 'G-H', 'A-OH'],
-                    startAngle: 292.5
+                    startAngle: 292.5,
+                    lastClickAngle: 0
                 }
             };
 
-            // 初始化碰撞点数据
             function initPoints() {
                 Object.keys(rings).forEach(key => {
                     const ring = rings[key];
@@ -251,98 +348,140 @@
             initPoints();
             checkCollisions();
 
+            function generateRandomTarget() {
+                const sugars = ['H', 'OH'];
+                const bases = ['A', 'G', 'C', 'T', 'U'];
+                let p1, p2, p3;
+                let isValid = false;
+                while (!isValid) {
+                    p1 = sugars[Math.floor(Math.random() * sugars.length)];
+                    p2 = bases[Math.floor(Math.random() * bases.length)];
+                    if ((p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H')) continue;
+                    const pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
+                    const possibleP3Bases = pairMap[p2];
+                    const p3Base = possibleP3Bases[Math.floor(Math.random() * possibleP3Bases.length)];
+                    const possibleP3Full = rings.r3.points.filter(p => p.startsWith(p3Base));
+                    if (possibleP3Full.length > 0) {
+                        p3 = possibleP3Full[Math.floor(Math.random() * possibleP3Full.length)];
+                        isValid = true;
+                    }
+                }
+                return { p1, p2, p3 };
+            }
+
             function checkCollisions() {
                 let collisions = { r1: [], r2: [], r3: [] };
                 const halfArcAngle = 22.5; 
-
                 Object.keys(rings).forEach(key => {
                     const ring = rings[key];
                     ring.pointAngles.forEach((baseAngle, i) => {
                         let currentAngle = (baseAngle + ring.angle) % 360;
                         if (currentAngle < 0) currentAngle += 360;
-
                         let diff = Math.abs(currentAngle - 0);
                         if (diff > 180) diff = 360 - diff;
-
                         if (diff <= halfArcAngle) {
                             collisions[key].push(ring.points[i]);
                         }
                     });
                 });
-
                 updateResultUI(collisions);
             }
 
             function updateResultUI(collisions) {
-                const nameMap = {
-                    'H': '脱氧核糖', 'OH': '核糖',
-                    'A': '腺嘌呤', 'G': '鸟嘌呤', 'C': '胞嘧啶', 'T': '胸腺嘧啶', 'U': '尿嘧啶',
-                    'A-H': '腺嘌呤脱氧核糖核苷酸', 'G-H': '鸟嘌呤脱氧核糖核苷酸', 'C-H': '胞嘧啶脱氧核糖核苷酸', 'T-H': '胸腺嘧啶脱氧核糖核苷酸',
-                    'A-OH': '腺嘌呤核糖核苷酸', 'G-OH': '鸟嘌呤核糖核苷酸', 'C-OH': '胞嘧啶核糖核苷酸', 'U-OH': '尿嘧啶核糖核苷酸'
-                };
-
-                // 如果没有任何碰撞
-                if (collisions.r1.length === 0 && collisions.r2.length === 0 && collisions.r3.length === 0) {
-                    resultList.innerHTML = '<div style="color: #999; font-size: 12px;">旋转圆环进行配对...</div>';
-                    return;
-                }
-
-                // 获取当前碰撞的第一个点
                 const p1 = collisions.r1[0];
                 const p2 = collisions.r2[0];
                 const p3 = collisions.r3[0];
 
-                let html = '<div class="result-group">';
-                
-                // 1. 内环与中环组成逻辑
-                if (p1 && p2) {
-                    html += `<span class="highlight-name">${nameMap[p1]}</span><br>与<br><span class="highlight-name">${nameMap[p2]}</span><br>组成<br>`;
-                    
-                    // 失败判定：T,OH 或 U,H
-                    const isFail = (p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H');
-                    if (isFail) {
-                        html += `<span class="status-fail">核苷酸失败</span>`;
-                    } else {
-                        // 成功组成，拼接名称
-                        const nucleotideName = nameMap[p2] + (p1 === 'H' ? '脱氧核糖' : '核糖') + '核苷酸';
-                        html += `<span class="highlight-name">${nucleotideName}</span>`;
-                        
-                        // 2. 与外环配对逻辑 (碱基互补配对)
-                        if (p3) {
-                            html += `<br>与<br><span class="highlight-name">${nameMap[p3]}</span><br>`;
-                            
-                            // 提取外环的碱基缩写 (例如 'A-H' 提取 'A')
-                            const p3Base = p3.split('-')[0];
-                            
-                            // 定义互补配对关系
-                            const pairMap = {
-                                'A': ['T', 'U'],
-                                'T': ['A'],
-                                'U': ['A'],
-                                'G': ['C'],
-                                'C': ['G']
-                            };
-
-                            // 判定逻辑：中环碱基 p2 是否在 外环碱基 p3Base 的互补列表中
-                            const isPaired = pairMap[p3Base] && pairMap[p3Base].includes(p2);
-
-                            if (isPaired) {
-                                html += `<span class="status-success">配对成功</span>`;
-                            } else {
-                                html += `<span class="status-fail">配对不成功</span>`;
+                if (currentMode === 'study') {
+                    if (!p1 && !p2 && !p3) {
+                        resultList.innerHTML = '<div style="color: #999; font-size: 14px;">旋转圆环进行配对...</div>';
+                        return;
+                    }
+                    let html = '<div class="result-group">';
+                    if (p1 && p2) {
+                        html += `<span class="highlight-name">${nameMap[p1]}</span><br>与<br><span class="highlight-name">${nameMap[p2]}</span><br>组成<br>`;
+                        const isFail = (p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H');
+                        if (isFail) {
+                            html += `<span class="status-fail">核苷酸失败</span>`;
+                        } else {
+                            const nucleotideName = nameMap[p2] + (p1 === 'H' ? '脱氧核糖' : '核糖') + '核苷酸';
+                            html += `<span class="nucleotide-name">${nucleotideName}</span>`;
+                            if (p3) {
+                                html += `<br>与<br><span class="highlight-name">${nameMap[p3]}</span><br>`;
+                                const p3Base = p3.split('-')[0];
+                                const pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
+                                const isPaired = pairMap[p3Base] && pairMap[p3Base].includes(p2);
+                                if (isPaired) {
+                                    html += `<span class="status-success">配对成功</span>`;
+                                } else {
+                                    html += `<span class="status-fail">配对不成功</span>`;
+                                }
                             }
                         }
+                    } else {
+                        if (p1) html += `内环：<span class="highlight-name">${nameMap[p1]}</span><br>`;
+                        if (p2) html += `中环：<span class="highlight-name">${nameMap[p2]}</span><br>`;
+                        if (p3) html += `外环：<span class="highlight-name">${nameMap[p3]}</span><br>`;
                     }
+                    html += '</div>';
+                    resultList.innerHTML = html;
                 } else {
-                    // 只有部分环碰撞时的提示
-                    if (p1) html += `内环：${nameMap[p1]}<br>`;
-                    if (p2) html += `中环：${nameMap[p2]}<br>`;
-                    if (p3) html += `外环：${nameMap[p3]}<br>`;
+                    // 测试模式：排布与学习模式一致，核苷酸名称为红字
+                    let html = '<div class="result-group test-mode-target">';
+                    html += '请配对：<br>';
+                    const a = nameMap[testTarget.p1];
+                    const b = nameMap[testTarget.p2];
+                    const c = nameMap[testTarget.p2] + (testTarget.p1 === 'H' ? '脱氧核糖' : '核糖') + '核苷酸';
+                    const d = nameMap[testTarget.p3];
+                    
+                    html += `<span class="highlight-name">${a}</span><br>与<br><span class="highlight-name">${b}</span><br>组成<br>`;
+                    html += `<span class="nucleotide-name">${c}</span><br>与<br>`;
+                    html += `<span class="highlight-name">${d}</span><br>配对`;
+                    html += '</div>';
+                    resultList.innerHTML = html;
                 }
-
-                html += '</div>';
-                resultList.innerHTML = html;
             }
+
+            btnStudy.onclick = () => {
+                currentMode = 'study';
+                btnStudy.classList.add('active');
+                btnTest.classList.remove('active');
+                btnConfirm.style.display = 'none';
+                containerTitle.innerText = '学习模式 - 详细解析';
+                checkCollisions();
+            };
+
+            btnTest.onclick = () => {
+                currentMode = 'test';
+                btnTest.classList.add('active');
+                btnStudy.classList.remove('active');
+                btnConfirm.style.display = 'block';
+                containerTitle.innerText = '测试模式 - 挑战目标';
+                testTarget = generateRandomTarget(); 
+                checkCollisions();
+            };
+
+            btnConfirm.onclick = () => {
+                let currentCollisions = { r1: null, r2: null, r3: null };
+                Object.keys(rings).forEach(key => {
+                    const ring = rings[key];
+                    ring.pointAngles.forEach((baseAngle, i) => {
+                        let currentAngle = (baseAngle + ring.angle) % 360;
+                        if (currentAngle < 0) currentAngle += 360;
+                        if (Math.abs(currentAngle - 0) < 5 || Math.abs(currentAngle - 360) < 5) {
+                            currentCollisions[key] = ring.points[i];
+                        }
+                    });
+                });
+
+                if (currentCollisions.r1 === testTarget.p1 && 
+                    currentCollisions.r2 === testTarget.p2 && 
+                    currentCollisions.r3 === testTarget.p3) {
+                    alert('🎉 恭喜！配对完全正确！');
+                } else {
+                    alert('❌ 配对不一致，请继续调整转盘。');
+                }
+            };
 
             let activeRing = null;
             let startMouseAngle = 0;
@@ -369,38 +508,38 @@
             function handleStart(e) {
                 const clientX = e.clientX || (e.touches && e.touches[0].clientX);
                 const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-                
                 if (clientX === undefined) return;
-
                 const dist = getDistanceFromCenter({ clientX, clientY });
-                
-                // 根据点击位置的半径判断操作哪个环
-                if (dist < rings.r1.radius) {
-                    activeRing = rings.r1;
-                } else if (dist < rings.r2.radius) {
-                    activeRing = rings.r2;
-                } else if (dist < rings.r3.radius) {
-                    activeRing = rings.r3;
-                } else {
-                    return;
-                }
+                if (dist < rings.r1.radius) activeRing = rings.r1;
+                else if (dist < rings.r2.radius) activeRing = rings.r2;
+                else if (dist < rings.r3.radius) activeRing = rings.r3;
+                else return;
 
                 startMouseAngle = getMouseAngle({ clientX, clientY });
                 startRingAngle = activeRing.angle;
+                activeRing.el.classList.add('dragging');
 
                 const moveHandler = (moveEvent) => {
+                    if (!activeRing) return;
                     const mX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0].clientX);
                     const mY = moveEvent.clientY || (moveEvent.touches && moveEvent.touches[0].clientY);
-                    
                     const currentMouseAngle = getMouseAngle({ clientX: mX, clientY: mY });
                     const deltaAngle = currentMouseAngle - startMouseAngle;
-                    
-                    activeRing.angle = startRingAngle + deltaAngle;
+                    const newAngle = startRingAngle + deltaAngle;
+                    if (Math.abs(newAngle - activeRing.lastClickAngle) >= 5) {
+                        playGearClick();
+                        activeRing.lastClickAngle = newAngle;
+                    }
+                    activeRing.angle = newAngle;
                     activeRing.el.style.transform = `translate(-50%, -50%) rotate(${activeRing.angle}deg)`;
-                    checkCollisions();
+                    if (currentMode === 'study') checkCollisions();
                 };
 
                 const endHandler = () => {
+                    if (activeRing) {
+                        activeRing.el.classList.remove('dragging');
+                        snapToGrid(activeRing);
+                    }
                     activeRing = null;
                     document.removeEventListener('mousemove', moveHandler);
                     document.removeEventListener('mouseup', endHandler);
@@ -414,9 +553,21 @@
                 document.addEventListener('touchend', endHandler);
             }
 
+            function snapToGrid(ring) {
+                const currentAngle = ring.angle;
+                const step = 45;
+                const base = ring.pointAngles[0];
+                const relativeAngle = currentAngle + base;
+                const snappedRelative = Math.round(relativeAngle / step) * step;
+                const targetAngle = snappedRelative - base;
+                ring.angle = targetAngle;
+                ring.el.style.transform = `translate(-50%, -50%) rotate(${ring.angle}deg)`;
+                playSnapSound();
+                setTimeout(checkCollisions, 600);
+            }
+
             root.addEventListener('mousedown', handleStart);
             root.addEventListener('touchstart', handleStart, { passive: false });
-
         })();
     </script>
 </body>
