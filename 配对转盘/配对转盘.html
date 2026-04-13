@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>同心圆旋转配对 - 挑战增强版</title>
+    <title>核苷酸配对转盘 - 比例修正版</title>
+    <script src="https://metis-online.fbcontent.cn/metis-misc/zgLDUdmazTYc0B4K6Cor.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -11,141 +12,189 @@
         }
 
         body {
-            background: #ffffff;
+            background: #f4f3ec;
             min-height: 100vh;
             margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: system-ui, -apple-system, sans-serif;
-            overflow: hidden;
+            font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+            overflow: hidden; /* 移除滚动条 */
             touch-action: none;
+        }
+
+        /* 
+           用户指定的精确像素比例 (已整体缩小至 30%，以适配 100% 页面缩放)：
+           R0 (中轴半径): 48.45px
+           W1 (内环宽度): 53.4px   -> R1 = 101.85px
+           W2 (中环宽度): 85.05px  -> R2 = 186.9px
+           W3 (外环宽度): 185.1px  -> R3 = 372px
+           
+           总直径 = 372 * 2 = 744px
+        */
+        :root {
+            --r0: 48.45px;
+            --r1: 101.85px;
+            --r2: 186.9px;
+            --r3: 372px;
+            --primary: #ff5600;
+            --secondary: #259525;
+            --text: #74706e;
         }
 
         .turntable-container {
             position: relative;
-            width: 800px;
-            height: 800px;
+            width: 744px;
+            height: 744px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: grab;
+            /* 移除强制缩放，现在 100% 缩放即可完美显示 */
+            transform-origin: center center;
+            flex-shrink: 0;
+            margin-right: 350px; 
+        }
+
+        @media (max-width: 1200px) {
+            .turntable-container {
+                transform: scale(0.8);
+                margin-right: 0;
+                margin-bottom: 200px;
+            }
+            .right-panel {
+                position: fixed;
+                bottom: 20px;
+                right: 50%;
+                transform: translateX(50%);
+                flex-direction: row;
+                top: auto;
+            }
+        }
+
+        @media (max-height: 800px) {
+            .turntable-container { transform: scale(0.8); }
         }
 
         .turntable-container:active {
             cursor: grabbing;
         }
 
-        /* 同心圆环容器 */
+        /* 每一环的容器：通过 overflow:hidden 实现物理切割 */
         .ring {
             position: absolute;
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
-            will-change: transform;
+            border-radius: 50%;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 50%;
-            overflow: hidden;
             transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            background: #fff;
+            /* 蓝色分界线 */
+            border: 2px solid #4a90e2; 
         }
 
         .ring.dragging {
             transition: none;
         }
 
+        /* 核心：所有层都使用原图，并缩放至 744px 的逻辑空间 */
         .ring img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
+            position: absolute;
+            width: 744px;
+            height: 744px;
+            max-width: none;
             pointer-events: none;
         }
 
-        #ring-1 { width: 320px; height: 320px; z-index: 30; }
-        #ring-2 { width: 560px; height: 560px; z-index: 20; }
-        #ring-3 { width: 800px; height: 800px; z-index: 10; }
+        /* 容器尺寸设置 (直径) */
+        #ring-outer { width: 744px; height: 744px; z-index: 10; }
+        #ring-middle { width: 373.8px; height: 373.8px; z-index: 20; } /* R2 * 2 */
+        #ring-inner { width: 203.7px; height: 203.7px; z-index: 30; }   /* R1 * 2 */
+        #ring-center { width: 96.9px; height: 96.9px; z-index: 40; }    /* R0 * 2 */
 
         /* 指示红线 */
         .indicator-line {
             position: absolute;
             left: 50%;
             top: 50%;
-            width: 400px;
-            height: 2px;
-            background: red;
+            width: 372px;
+            height: 4px;
+            background: var(--primary);
             transform-origin: left center;
             transform: translateY(-50%);
             pointer-events: none;
             z-index: 100;
+            opacity: 0;
         }
 
-        /* 右侧容器外层，包含按钮 */
+        /* 右侧面板 */
         .right-panel {
             position: fixed;
-            right: 20px;
+            right: 40px;
             top: 50%;
             transform: translateY(-50%);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 16px;
             align-items: center;
+            z-index: 200;
         }
 
-        /* 模式切换按钮 */
         .mode-switch {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             width: 100%;
         }
 
         .mode-btn {
             flex: 1;
-            padding: 10px 0;
-            border: 1px solid #ddd;
-            background: #f0f0f0;
-            border-radius: 6px;
+            padding: 12px 0;
+            border: 2px solid #e5e7eb;
+            background: #ffffff;
+            border-radius: 12px;
             cursor: pointer;
             font-size: 16px;
             font-weight: bold;
-            transition: all 0.2s;
+            color: var(--text);
+            transition: all 0.3s ease;
         }
 
         .mode-btn.active {
-            background: #2563eb;
+            background: var(--primary);
             color: white;
-            border-color: #2563eb;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(255, 86, 0, 0.2);
         }
 
-        /* 右侧结果容器 */
         .result-container {
-            width: 300px;
-            height: 500px;
-            background: #f9f9f9;
-            border: 2px solid #ddd;
-            border-radius: 12px;
-            padding: 20px;
+            width: 320px;
+            min-height: 480px;
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 24px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            gap: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
             text-align: center;
         }
 
         .result-title {
             font-weight: bold;
             font-size: 20px;
-            color: #333;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 8px;
+            color: #0c0302;
+            border-bottom: 2px solid #f4f3ec;
+            padding-bottom: 12px;
         }
 
         .result-list {
             flex: 1;
-            overflow-y: auto;
-            font-family: system-ui, sans-serif;
             font-size: 18px;
-            color: #444;
+            color: var(--text);
             line-height: 1.6;
             display: flex;
             flex-direction: column;
@@ -153,86 +202,61 @@
             align-items: center;
         }
 
-        .result-group {
-            width: 100%;
-            padding: 10px 0;
-        }
+        .highlight-name { color: var(--primary); font-weight: 600; }
+        .nucleotide-name { color: var(--primary); font-weight: bold; }
+        .status-success { color: var(--secondary); font-weight: bold; margin-top: 12px; font-size: 20px; }
+        .status-fail { color: #dc2626; font-weight: bold; margin-top: 12px; }
 
-        /* 组分名称高亮 - 蓝色 */
-        .highlight-name {
-            color: #2563eb;
-            font-weight: 600;
-        }
-
-        /* 核苷酸名称高亮 - 红色 */
-        .nucleotide-name {
-            color:#2563eb;
-            font-weight: bold;
-        }
-
-        /* 测试模式目标文本 */
-        .test-mode-target {
-            font-weight: bold;
-            font-size: 18px;
-        }
-
-        .status-success {
-            color: #059669;
-            font-weight: bold;
-            margin-top: 8px;
-        }
-
-        .status-fail {
-            color: #dc2626;
-            font-weight: bold;
-            margin-top: 8px;
-        }
-
-        /* 确认按钮样式 */
         #btnConfirm {
             width: 100%;
-            padding: 12px;
-            background: #059669;
+            padding: 16px;
+            background: var(--secondary);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 16px;
             cursor: pointer;
             font-size: 18px;
             font-weight: bold;
-            margin-top: 5px;
-            display: none; /* 默认隐藏 */
-            transition: background 0.2s;
-        }
-
-        #btnConfirm:hover {
-            background: #047857;
+            display: none;
+            transition: all 0.3s ease;
         }
 
         .hint {
             position: fixed;
-            top: 20px;
+            top: 30px;
             left: 50%;
             transform: translateX(-50%);
-            background: #f0f0f0;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 16px;
-            color: #333;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 12px 24px;
+            border-radius: 100px;
+            font-size: 14px;
+            color: var(--text);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             z-index: 200;
         }
     </style>
 </head>
 <body>
+
     <div class="turntable-container" id="turntableRoot">
-        <div class="ring" id="ring-1">
-            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/VuZeUtWghFw9nLrQbADeyg.png" alt="图1">
+        <!-- 外环 (1200px) -->
+        <div class="ring" id="ring-outer">
+            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg" alt="外环">
         </div>
-        <div class="ring" id="ring-2">
-            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/LE9XM5g5fNPMCRQjDqAHxH.jpg" alt="图2">
+        <!-- 中环 (920px) -->
+        <div class="ring" id="ring-middle">
+            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg" alt="中环">
         </div>
-        <div class="ring" id="ring-3">
-            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/itU9YHhDyxQBPb8j6rTJdQ.jpg" alt="图3">
+        <!-- 内环 (480px) -->
+        <div class="ring" id="ring-inner">
+            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg" alt="内环">
         </div>
+        <!-- 中轴 (200px) -->
+        <div class="ring" id="ring-center">
+            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg" alt="中轴">
+        </div>
+        
+        <!-- 指示线 -->
         <div class="indicator-line"></div>
     </div>
 
@@ -244,7 +268,7 @@
         <div class="result-container">
             <div class="result-title" id="containerTitle">碰撞检测结果</div>
             <div class="result-list" id="resultList">
-                <div style="color: #999; font-size: 14px;">旋转圆环使点与红线重合...</div>
+                <div style="color: #999; font-size: 14px;">旋转圆环使结构与红线重合...</div>
             </div>
             <button id="btnConfirm">确认配对</button>
         </div>
@@ -269,109 +293,55 @@
                 'A-OH': '腺嘌呤核糖核苷酸', 'G-OH': '鸟嘌呤核糖核苷酸', 'C-OH': '胞嘧啶核糖核苷酸', 'U-OH': '尿嘧啶核糖核苷酸'
             };
 
-            // 音效系统
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
             function playSnapSound() {
                 if (audioCtx.state === 'suspended') audioCtx.resume();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                oscillator.type = 'sine'; 
-                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
-                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.1);
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
             }
 
-            function playGearClick() {
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-                const bufferSize = audioCtx.sampleRate * 0.05;
-                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = Math.random() * 2 - 1;
-                }
-                const noise = audioCtx.createBufferSource();
-                noise.buffer = buffer;
-                const filter = audioCtx.createBiquadFilter();
-                filter.type = 'bandpass';
-                filter.frequency.value = 600;
-                filter.Q.value = 5;
-                const gainNode = audioCtx.createGain();
-                gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
-                noise.connect(filter);
-                filter.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                noise.start();
-            }
+            // 修正后的半径参数 (已整体缩小至 30%)
+            const R_CENTER = 48.45;
+            const R_INNER = 101.85;
+            const R_MIDDLE = 186.9;
+            const R_OUTER = 372;
 
             const rings = {
-                r1: { 
-                    el: document.getElementById('ring-1'), 
+                inner: { 
+                    el: document.getElementById('ring-inner'), 
                     angle: 0, 
-                    radius: 160,
                     points: ['H', 'OH', 'H', 'OH', 'H', 'OH', 'H', 'OH'],
-                    startAngle: 90,
-                    lastClickAngle: 0
+                    startAngle: 157.5
                 },
-                r2: { 
-                    el: document.getElementById('ring-2'), 
+                middle: { 
+                    el: document.getElementById('ring-middle'), 
                     angle: 0, 
-                    radius: 280,
-                    points: ['C', 'G', 'A', 'C', 'T', 'U', 'G', 'A'],
-                    startAngle: 292.5,
-                    lastClickAngle: 0
+                    points: [ 'A' , 'C' , 'T' , 'G' , 'A' , 'C' , 'U' , 'G'],
+                    startAngle: 292.5
                 },
-                r3: { 
-                    el: document.getElementById('ring-3'), 
+                outer: { 
+                    el: document.getElementById('ring-outer'), 
                     angle: 0, 
-                    radius: 400,
-                    points: ['C-H', 'G-OH', 'A-H', 'C-OH', 'T-H', 'U-OH', 'G-H', 'A-OH'],
-                    startAngle: 292.5,
-                    lastClickAngle: 0
+                    points: [ 'T-H' , 'G-OH' , 'A-H' , 'C-OH' , 'U-OH' ,  'G-H' , 'A-OH' , 'C-H' ],
+                    startAngle: 292.5
                 }
             };
 
             function initPoints() {
                 Object.keys(rings).forEach(key => {
                     const ring = rings[key];
-                    ring.pointAngles = ring.points.map((name, i) => {
-                        return ring.startAngle + i * 45;
-                    });
+                    ring.pointAngles = ring.points.map((_, i) => ring.startAngle + i * 45 + 22.5);
                 });
             }
             initPoints();
-            checkCollisions();
-
-            function generateRandomTarget() {
-                const sugars = ['H', 'OH'];
-                const bases = ['A', 'G', 'C', 'T', 'U'];
-                let p1, p2, p3;
-                let isValid = false;
-                while (!isValid) {
-                    p1 = sugars[Math.floor(Math.random() * sugars.length)];
-                    p2 = bases[Math.floor(Math.random() * bases.length)];
-                    if ((p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H')) continue;
-                    const pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
-                    const possibleP3Bases = pairMap[p2];
-                    const p3Base = possibleP3Bases[Math.floor(Math.random() * possibleP3Bases.length)];
-                    const possibleP3Full = rings.r3.points.filter(p => p.startsWith(p3Base));
-                    if (possibleP3Full.length > 0) {
-                        p3 = possibleP3Full[Math.floor(Math.random() * possibleP3Full.length)];
-                        isValid = true;
-                    }
-                }
-                return { p1, p2, p3 };
-            }
 
             function checkCollisions() {
-                let collisions = { r1: [], r2: [], r3: [] };
-                const halfArcAngle = 22.5; 
+                let collisions = { inner: [], middle: [], outer: [] };
                 Object.keys(rings).forEach(key => {
                     const ring = rings[key];
                     ring.pointAngles.forEach((baseAngle, i) => {
@@ -379,19 +349,14 @@
                         if (currentAngle < 0) currentAngle += 360;
                         let diff = Math.abs(currentAngle - 0);
                         if (diff > 180) diff = 360 - diff;
-                        if (diff <= halfArcAngle) {
-                            collisions[key].push(ring.points[i]);
-                        }
+                        if (diff <= 22.5) collisions[key].push(ring.points[i]);
                     });
                 });
                 updateResultUI(collisions);
             }
 
             function updateResultUI(collisions) {
-                const p1 = collisions.r1[0];
-                const p2 = collisions.r2[0];
-                const p3 = collisions.r3[0];
-
+                const p1 = collisions.inner[0], p2 = collisions.middle[0], p3 = collisions.outer[0];
                 if (currentMode === 'study') {
                     if (!p1 && !p2 && !p3) {
                         resultList.innerHTML = '<div style="color: #999; font-size: 14px;">旋转圆环进行配对...</div>';
@@ -399,23 +364,16 @@
                     }
                     let html = '<div class="result-group">';
                     if (p1 && p2) {
-                        html += `<span class="highlight-name">${nameMap[p1]}</span><br>与<br><span class="highlight-name">${nameMap[p2]}</span><br>组成<br>`;
+                        html += `<span class="highlight-name">${nameMap[p1]}</span><br>+<br><span class="highlight-name">${nameMap[p2]}</span><br>↓<br>`;
                         const isFail = (p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H');
-                        if (isFail) {
-                            html += `<span class="status-fail">核苷酸失败</span>`;
-                        } else {
-                            const nucleotideName = nameMap[p2] + (p1 === 'H' ? '脱氧核糖' : '核糖') + '核苷酸';
-                            html += `<span class="nucleotide-name">${nucleotideName}</span>`;
+                        if (isFail) html += `<span class="status-fail">组合失败：${p2}不与${nameMap[p1]}结合</span>`;
+                        else {
+                            html += `<span class="nucleotide-name">${nameMap[p2]}${p1 === 'H' ? '脱氧核糖' : '核糖'}核苷酸</span>`;
                             if (p3) {
-                                html += `<br>与<br><span class="highlight-name">${nameMap[p3]}</span><br>`;
-                                const p3Base = p3.split('-')[0];
-                                const pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
-                                const isPaired = pairMap[p3Base] && pairMap[p3Base].includes(p2);
-                                if (isPaired) {
-                                    html += `<span class="status-success">配对成功</span>`;
-                                } else {
-                                    html += `<span class="status-fail">配对不成功</span>`;
-                                }
+                                html += `<br><div style="margin:10px 0; border-top:1px dashed #ddd;"></div>与外环配对：<br><span class="highlight-name">${nameMap[p3]}</span><br>`;
+                                const p3Base = p3.split('-')[0], pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
+                                if (pairMap[p3Base] && pairMap[p3Base].includes(p2)) html += `<span class="status-success">★ 碱基互补配对成功</span>`;
+                                else html += `<span class="status-fail">配对不成功</span>`;
                             }
                         }
                     } else {
@@ -426,111 +384,82 @@
                     html += '</div>';
                     resultList.innerHTML = html;
                 } else {
-                    // 测试模式：排布与学习模式一致，核苷酸名称为红字
-                    let html = '<div class="result-group test-mode-target">';
+                    let html = '<div class="result-group">';
                     html += '请配对：<br>';
-                    const a = nameMap[testTarget.p1];
-                    const b = nameMap[testTarget.p2];
-                    const c = nameMap[testTarget.p2] + (testTarget.p1 === 'H' ? '脱氧核糖' : '核糖') + '核苷酸';
-                    const d = nameMap[testTarget.p3];
-                    
-                    html += `<span class="highlight-name">${a}</span><br>与<br><span class="highlight-name">${b}</span><br>组成<br>`;
-                    html += `<span class="nucleotide-name">${c}</span><br>与<br>`;
-                    html += `<span class="highlight-name">${d}</span><br>配对`;
+                    html += `<span class="highlight-name">${nameMap[testTarget.p1]}</span><br>+<br><span class="highlight-name">${nameMap[testTarget.p2]}</span><br>↓<br>`;
+                    html += `<span class="nucleotide-name">${nameMap[testTarget.p2]}${testTarget.p1 === 'H' ? '脱氧核糖' : '核糖'}核苷酸</span><br>与<br>`;
+                    html += `<span class="highlight-name">${nameMap[testTarget.p3]}</span><br>配对`;
                     html += '</div>';
                     resultList.innerHTML = html;
                 }
             }
 
             btnStudy.onclick = () => {
-                currentMode = 'study';
-                btnStudy.classList.add('active');
-                btnTest.classList.remove('active');
-                btnConfirm.style.display = 'none';
-                containerTitle.innerText = '学习模式 - 详细解析';
-                checkCollisions();
+                currentMode = 'study'; btnStudy.classList.add('active'); btnTest.classList.remove('active');
+                btnConfirm.style.display = 'none'; containerTitle.innerText = '学习模式 - 详细解析'; checkCollisions();
             };
 
             btnTest.onclick = () => {
-                currentMode = 'test';
-                btnTest.classList.add('active');
-                btnStudy.classList.remove('active');
-                btnConfirm.style.display = 'block';
-                containerTitle.innerText = '测试模式 - 挑战目标';
-                testTarget = generateRandomTarget(); 
+                currentMode = 'test'; btnTest.classList.add('active'); btnStudy.classList.remove('active');
+                btnConfirm.style.display = 'block'; containerTitle.innerText = '测试模式 - 挑战目标';
+                testTarget = (function() {
+                    const sugars = ['H', 'OH'], bases = ['A', 'G', 'C', 'T', 'U'];
+                    let p1, p2, p3, isValid = false;
+                    while (!isValid) {
+                        p1 = sugars[Math.floor(Math.random() * 2)]; p2 = bases[Math.floor(Math.random() * 5)];
+                        if ((p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H')) continue;
+                        const pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
+                        const p3Base = pairMap[p2][Math.floor(Math.random() * pairMap[p2].length)];
+                        const possibleP3 = rings.outer.points.filter(p => p.startsWith(p3Base));
+                        if (possibleP3.length > 0) { p3 = possibleP3[Math.floor(Math.random() * possibleP3.length)]; isValid = true; }
+                    }
+                    return { p1, p2, p3 };
+                })();
                 checkCollisions();
             };
 
             btnConfirm.onclick = () => {
-                let currentCollisions = { r1: null, r2: null, r3: null };
+                let cur = { inner: null, middle: null, outer: null };
                 Object.keys(rings).forEach(key => {
                     const ring = rings[key];
                     ring.pointAngles.forEach((baseAngle, i) => {
                         let currentAngle = (baseAngle + ring.angle) % 360;
                         if (currentAngle < 0) currentAngle += 360;
-                        if (Math.abs(currentAngle - 0) < 5 || Math.abs(currentAngle - 360) < 5) {
-                            currentCollisions[key] = ring.points[i];
-                        }
+                        if (Math.abs(currentAngle - 0) < 5 || Math.abs(currentAngle - 360) < 5) cur[key] = ring.points[i];
                     });
                 });
-
-                if (currentCollisions.r1 === testTarget.p1 && 
-                    currentCollisions.r2 === testTarget.p2 && 
-                    currentCollisions.r3 === testTarget.p3) {
-                    alert('🎉 恭喜！配对完全正确！');
-                } else {
-                    alert('❌ 配对不一致，请继续调整转盘。');
-                }
+                if (cur.inner === testTarget.p1 && cur.middle === testTarget.p2 && cur.outer === testTarget.p3) alert('🎉 恭喜！配对完全正确！');
+                else alert('❌ 配对不一致，请继续调整转盘。');
             };
 
-            let activeRing = null;
-            let startMouseAngle = 0;
-            let startRingAngle = 0;
-
+            let activeRing = null, startMouseAngle = 0, startRingAngle = 0;
             function getMouseAngle(e) {
                 const rect = root.getBoundingClientRect();
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
-                const dx = e.clientX - cx;
-                const dy = e.clientY - cy;
-                return Math.atan2(dy, dx) * (180 / Math.PI);
-            }
-
-            function getDistanceFromCenter(e) {
-                const rect = root.getBoundingClientRect();
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
-                const dx = e.clientX - cx;
-                const dy = e.clientY - cy;
-                return Math.sqrt(dx * dx + dy * dy);
+                const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+                return Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI);
             }
 
             function handleStart(e) {
                 const clientX = e.clientX || (e.touches && e.touches[0].clientX);
                 const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-                if (clientX === undefined) return;
-                const dist = getDistanceFromCenter({ clientX, clientY });
-                if (dist < rings.r1.radius) activeRing = rings.r1;
-                else if (dist < rings.r2.radius) activeRing = rings.r2;
-                else if (dist < rings.r3.radius) activeRing = rings.r3;
+                const rect = root.getBoundingClientRect();
+                const dx = clientX - (rect.left + rect.width / 2), dy = clientY - (rect.top + rect.height / 2);
+                const dist = Math.sqrt(dx * dx + dy * dy); // 100% 缩放，无需还原缩放系数
+
+                if (dist < R_CENTER) return;
+                else if (dist < R_INNER) activeRing = rings.inner;
+                else if (dist < R_MIDDLE) activeRing = rings.middle;
+                else if (dist < R_OUTER) activeRing = rings.outer;
                 else return;
 
                 startMouseAngle = getMouseAngle({ clientX, clientY });
                 startRingAngle = activeRing.angle;
                 activeRing.el.classList.add('dragging');
 
-                const moveHandler = (moveEvent) => {
+                const moveHandler = (me) => {
                     if (!activeRing) return;
-                    const mX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0].clientX);
-                    const mY = moveEvent.clientY || (moveEvent.touches && moveEvent.touches[0].clientY);
-                    const currentMouseAngle = getMouseAngle({ clientX: mX, clientY: mY });
-                    const deltaAngle = currentMouseAngle - startMouseAngle;
-                    const newAngle = startRingAngle + deltaAngle;
-                    if (Math.abs(newAngle - activeRing.lastClickAngle) >= 5) {
-                        playGearClick();
-                        activeRing.lastClickAngle = newAngle;
-                    }
-                    activeRing.angle = newAngle;
+                    const mX = me.clientX || (me.touches && me.touches[0].clientX), mY = me.clientY || (me.touches && me.touches[0].clientY);
+                    activeRing.angle = startRingAngle + (getMouseAngle({ clientX: mX, clientY: mY }) - startMouseAngle);
                     activeRing.el.style.transform = `translate(-50%, -50%) rotate(${activeRing.angle}deg)`;
                     if (currentMode === 'study') checkCollisions();
                 };
@@ -538,36 +467,20 @@
                 const endHandler = () => {
                     if (activeRing) {
                         activeRing.el.classList.remove('dragging');
-                        snapToGrid(activeRing);
+                        const step = 45, base = activeRing.pointAngles[0];
+                        activeRing.angle = Math.round((activeRing.angle + base) / step) * step - base;
+                        activeRing.el.style.transform = `translate(-50%, -50%) rotate(${activeRing.angle}deg)`;
+                        playSnapSound(); setTimeout(checkCollisions, 600);
                     }
                     activeRing = null;
-                    document.removeEventListener('mousemove', moveHandler);
-                    document.removeEventListener('mouseup', endHandler);
-                    document.removeEventListener('touchmove', moveHandler);
-                    document.removeEventListener('touchend', endHandler);
+                    document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', endHandler);
+                    document.removeEventListener('touchmove', moveHandler); document.removeEventListener('touchend', endHandler);
                 };
-
-                document.addEventListener('mousemove', moveHandler);
-                document.addEventListener('mouseup', endHandler);
-                document.addEventListener('touchmove', moveHandler, { passive: false });
-                document.addEventListener('touchend', endHandler);
+                document.addEventListener('mousemove', moveHandler); document.addEventListener('mouseup', endHandler);
+                document.addEventListener('touchmove', moveHandler, { passive: false }); document.addEventListener('touchend', endHandler);
             }
-
-            function snapToGrid(ring) {
-                const currentAngle = ring.angle;
-                const step = 45;
-                const base = ring.pointAngles[0];
-                const relativeAngle = currentAngle + base;
-                const snappedRelative = Math.round(relativeAngle / step) * step;
-                const targetAngle = snappedRelative - base;
-                ring.angle = targetAngle;
-                ring.el.style.transform = `translate(-50%, -50%) rotate(${ring.angle}deg)`;
-                playSnapSound();
-                setTimeout(checkCollisions, 600);
-            }
-
-            root.addEventListener('mousedown', handleStart);
-            root.addEventListener('touchstart', handleStart, { passive: false });
+            root.addEventListener('mousedown', handleStart); root.addEventListener('touchstart', handleStart, { passive: false });
+            checkCollisions();
         })();
     </script>
 </body>
