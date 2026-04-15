@@ -161,7 +161,7 @@
 
     /* 出牌槽位 */
     .slot {
-      border: 2px dashed rgba(174, 118, 69, 0.4);
+      border: 0px dashed rgba(174, 118, 69, 0.4);
       border-radius: 12px;
       display: flex;
       align-items: center;
@@ -192,8 +192,10 @@
       height: 340px; /* 稍微增大高度 */
     }
 
-    .slot .pai-tile { margin-left: 0; cursor: default; transform: none !important; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 90%; height: 90%; font-size: 12px; }
+    .slot .pai-tile { margin-left: 0; cursor: default; transform: none !important; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 90%; height: 90%; }
+    .slot .tile-name { font-size: 16px; }
     .slot-small .pai-tile { font-size: 10px; }
+    .slot-small .tile-name { font-size: 10px; }
 
     /* 3. 按钮栏 */
     .button-area {
@@ -218,6 +220,30 @@
     .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
     .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
     .btn:active:not(:disabled) { transform: translateY(1px); }
+
+    /* 矩阵按钮样式 */
+    .matrix-container {
+      display: none;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      z-index: 300;
+    }
+    .matrix-btn {
+      padding: 8px 15px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid #AE7645;
+      background: linear-gradient(to bottom, #F59E0B, #D97706);
+      color: #021502;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      text-align: center;
+      line-height: 1.2;
+    }
+    .matrix-btn:hover { transform: scale(1.05); box-shadow: 0 6px 12px rgba(0,0,0,0.4); }
+    .matrix-btn span { display: block; font-size: 10px; opacity: 0.8; font-weight: normal; }
 
     /* 4. 底部手牌区 */
     .bottom-area {
@@ -284,7 +310,7 @@
     .pai-tile:hover { transform: translateY(-25px); z-index: 100 !important; }
     .pai-tile.selected { transform: translateY(-45px); border-color: #DC2626; border-width: 3px; z-index: 50 !important; box-shadow: 0 10px 20px rgba(220, 38, 38, 0.4); }
     
-    .tile-name { font-size: 13px; text-align: center; padding: 6px 2px; background: rgba(255,255,255,0.9); width: 100%; position: absolute; bottom: 0; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+    .tile-name { font-size: 10px; text-align: center; padding: 6px 2px; background: rgba(255,255,255,0.9); width: 100%; position: absolute; bottom: 0; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tile-level { position: absolute; top: 8px; left: 8px; font-size: 20px; color: #AE7645; font-family: 'Georgia', serif; }
     .tile-id { font-size: 10px; opacity: 0.6; margin-top: -20px; }
 
@@ -447,8 +473,17 @@
 
   <!-- 3. 按钮栏 -->
   <div class="button-area">
-    <button class="btn btn-pass" onclick="handlePass()">跳过 (PASS)</button>
+    <button class="btn btn-pass" id="passBtn" onclick="handlePass()">跳过 (PASS)</button>
     <button class="btn btn-play" id="playBtn" onclick="handlePlay()" disabled>出牌 (PLAY)</button>
+    
+    <!-- 矩阵按钮 -->
+    <div class="matrix-container" id="matrixBtns">
+      <button class="matrix-btn" onclick="handleMatrixPlay('DNA_REP')">DNA 复制<span>脱氧+脱氧</span></button>
+      <button class="matrix-btn" onclick="handleMatrixPlay('DNA_TRANS')">DNA 转录<span>核糖+脱氧</span></button>
+      <button class="matrix-btn" onclick="handleMatrixPlay('RNA_REP')">蛋白质 合成<span>核糖+核糖</span></button>
+      <button class="matrix-btn" onclick="handleMatrixPlay('RNA_TRANS')">RNA 逆转录<span>脱氧+核糖</span></button>
+    </div>
+
     <button class="btn btn-pass" style="padding: 8px 20px; font-size: 14px;" onclick="location.reload()">重新开始</button>
   </div>
 
@@ -475,33 +510,33 @@
 <script>
   // --- 核心数据配置 ---
   const TILE_IMAGES = {
-    '6': 'resources/grade6/核酸.webp',
-    '5.H': 'resources/grade5/DNA.webp',
-    '5.OH': 'resources/grade5/RNA.webp',
-    '4.': 'resources/grade4/核苷酸.webp',
-    '3.H': 'resources/grade3/脱氧核糖核苷酸.webp',
-    '3.OH': 'resources/grade3/核糖核苷酸.webp',
-    '2.H.P.A': 'resources/grade2/腺嘌呤脱氧核糖核苷酸.webp',
-    '2.H.P.T': 'resources/grade2/胸腺嘧啶脱氧核糖核苷酸.webp',
-    '2.H.P.C': 'resources/grade2/胞嘧啶脱氧核糖核苷酸.webp',
-    '2.H.P.G': 'resources/grade2/鸟嘌呤脱氧核糖核苷酸.webp',
-    '2.OH.P.A': 'resources/grade2/腺嘌呤核糖核苷酸.webp',
-    '2.OH.P.U': 'resources/grade2/尿嘧啶核糖核苷酸.webp',
-    '2.OH.P.C': 'resources/grade2/胞嘧啶核糖核苷酸.webp',
-    '2.OH.P.G': 'resources/grade2/鸟嘌呤核糖核苷酸.webp',
-    '1.H.P': 'resources/grade1/脱氧核糖-磷酸骨架.webp',
-    '1.OH.P': 'resources/grade1/核糖-磷酸骨架.webp',
-    '1.A': 'resources/grade0/腺嘌呤.webp',
-    '1.T': 'resources/grade0/胸腺嘧啶.webp',
-    '1.C': 'resources/grade0/胞嘧啶.webp',
-    '1.G': 'resources/grade0/鸟嘌呤.webp',
-    '1.U': 'resources/grade0/尿嘧啶.webp'
+    '6': 'resources/grade6/核酸.png',
+    '5.H': 'resources/grade5/DNA.png',
+    '5.OH': 'resources/grade5/RNA.png',
+    '4.': 'resources/grade4/核苷酸.png',
+    '3.H': 'resources/grade3/脱氧核糖核苷酸.png',
+    '3.OH': 'resources/grade3/核糖核苷酸.png',
+    '2.H.P.A': 'resources/grade2/腺嘌呤脱氧核糖核苷酸.png',
+    '2.H.P.T': 'resources/grade2/胸腺嘧啶脱氧核糖核苷酸.png',
+    '2.H.P.C': 'resources/grade2/胞嘧啶脱氧核糖核苷酸.png',
+    '2.H.P.G': 'resources/grade2/鸟嘌呤脱氧核糖核苷酸.png',
+    '2.OH.P.A': 'resources/grade2/腺嘌呤核糖核苷酸.png',
+    '2.OH.P.U': 'resources/grade2/尿嘧啶核糖核苷酸.png',
+    '2.OH.P.C': 'resources/grade2/胞嘧啶核糖核苷酸.png',
+    '2.OH.P.G': 'resources/grade2/鸟嘌呤核糖核苷酸.png',
+    '1.H.P': 'resources/grade1/脱氧核糖-磷酸骨架.png',
+    '1.OH.P': 'resources/grade1/核糖-磷酸骨架.png',
+    '1.A': 'resources/grade0/腺嘌呤.png',
+    '1.T': 'resources/grade0/胸腺嘧啶.png',
+    '1.C': 'resources/grade0/胞嘧啶.png',
+    '1.G': 'resources/grade0/鸟嘌呤.png',
+    '1.U': 'resources/grade0/尿嘧啶.png'
   };
 
   const TILE_NAMES = {
     '6': '核酸', '5.H': '脱氧核糖核酸', '5.OH': '核糖核酸', '4.': '核苷酸',
     '3.H': '脱氧核糖核苷酸', '3.OH': '核糖核苷酸',
-    '2.H.P.A': '腺嘌呤脱氧核糖核苷酸', '2.H.P.T': '胸腺嘧啶脱氧核糖核苷酸', '2.H.P.C': '胞嘧啶核糖核苷酸', '2.H.P.G': '鸟嘌呤核糖核苷酸',
+    '2.H.P.A': '腺嘌呤脱氧核糖核苷酸', '2.H.P.T': '胸腺嘧啶脱氧核糖核苷酸', '2.H.P.C': '胞嘧啶脱氧核糖核苷酸', '2.H.P.G': '鸟嘌呤脱氧核糖核苷酸',
     '2.OH.P.A': '腺嘌呤核糖核苷酸', '2.OH.P.U': '尿嘧啶核糖核苷酸', '2.OH.P.C': '胞嘧啶核糖核苷酸', '2.OH.P.G': '鸟嘌呤核糖核苷酸',
     '1.H.P': '脱氧核糖-磷酸骨架', '1.OH.P': '核糖-磷酸骨架',
     '1.A': '腺嘌呤', '1.T': '胸腺嘧啶', '1.C': '胞嘧啶', '1.G': '鸟嘌呤', '1.U': '尿嘧啶'
@@ -620,12 +655,10 @@
       if (TILE_IMAGES[tile]) {
         div.style.backgroundImage = `url('${TILE_IMAGES[tile]}')`;
         div.innerHTML = `
-          <div class="tile-level">${TILE_LEVELS[tile]}</div>
           <div class="tile-name">${TILE_NAMES[tile]}</div>
         `;
       } else {
         div.innerHTML = `
-          <div class="tile-level">${TILE_LEVELS[tile]}</div>
           <div class="tile-id">${tile}</div>
           <div class="tile-name">${TILE_NAMES[tile]}</div>
         `;
@@ -674,38 +707,129 @@
 
   function checkPlayable() {
     const btn = document.getElementById('playBtn');
+    const matrix = document.getElementById('matrixBtns');
+    const passBtn = document.getElementById('passBtn');
+
     if (currentPlayerIndex !== 0 || selectedIndices.length === 0) {
       btn.disabled = true;
+      btn.style.display = 'block';
+      matrix.style.display = 'none';
       return;
     }
 
-    // 检查选中的牌是否能大过场上的牌
     let canPlaySelected = false;
+    let isSpecialNucleotide = false;
+    let currentComboTile = '';
+
     if (selectedIndices.length === 1) {
       const tile = playerHand[selectedIndices[0]];
+      if (TILE_LEVELS[tile] === 2) isSpecialNucleotide = true;
+      
       if (!lastPlayedTile) {
         canPlaySelected = true;
       } else {
         canPlaySelected = canBeat(tile, lastPlayedTile);
       }
-    } else {
-      // 组合逻辑 (1级+1级)
+    } else if (selectedIndices.length === 2) {
       const t1 = playerHand[selectedIndices[0]];
       const t2 = playerHand[selectedIndices[1]];
       if (canCombine(t1, t2)) {
+        isSpecialNucleotide = true;
         const isP1 = t1.includes('.P');
         const sugar = isP1 ? t1.split('.')[1] : t2.split('.')[1];
         const base = isP1 ? t2.split('.')[1] : t1.split('.')[1];
-        const comboTile = `2.${sugar}.P.${base}`;
+        currentComboTile = `2.${sugar}.P.${base}`;
+        
         if (!lastPlayedTile) {
           canPlaySelected = true;
         } else {
-          canPlaySelected = canBeat(comboTile, lastPlayedTile);
+          canPlaySelected = canBeat(currentComboTile, lastPlayedTile);
         }
       }
     }
     
-    btn.disabled = !canPlaySelected;
+    // 修正：只有当场上也是 2 级牌时，才显示矩阵按钮进行配对校验
+    const isLastTileLevel2 = lastPlayedTile && TILE_LEVELS[lastPlayedTile] === 2;
+    
+    if (canPlaySelected && isSpecialNucleotide && isLastTileLevel2) {
+      btn.style.display = 'none';
+      matrix.style.display = 'grid';
+    } else {
+      btn.style.display = 'block';
+      matrix.style.display = 'none';
+      btn.disabled = !canPlaySelected;
+    }
+  }
+
+  // 矩阵出牌处理
+  function handleMatrixPlay(type) {
+    if (currentPlayerIndex !== 0) return;
+    
+    let playedTile = '';
+    let sugarType = ''; // H or OH
+    
+    if (selectedIndices.length === 1) {
+      playedTile = playerHand[selectedIndices[0]];
+    } else {
+      const t1 = playerHand[selectedIndices[0]];
+      const t2 = playerHand[selectedIndices[1]];
+      const isP1 = t1.includes('.P');
+      sugarType = isP1 ? t1.split('.')[1] : t2.split('.')[1];
+      const base = isP1 ? t2.split('.')[1] : t1.split('.')[1];
+      playedTile = `2.${sugarType}.P.${base}`;
+    }
+    
+    // 获取当前选中的牌的糖类型
+    sugarType = playedTile.split('.')[1]; // H or OH
+    
+    // 获取场上牌的糖类型
+    let prevSugar = '';
+    if (lastPlayedTile) {
+      const parts = lastPlayedTile.split('.');
+      if (parts[0] === '1' && parts[1].includes('P')) prevSugar = parts[1]; // 1.H.P -> H
+      else prevSugar = parts[1]; // 2.H.P.A -> H, 3.H -> H
+    }
+
+    let isCorrect = false;
+    let actionName = '';
+
+    switch(type) {
+      case 'DNA_REP': // 脱氧 + 脱氧
+        isCorrect = (sugarType === 'H' && (!lastPlayedTile || prevSugar === 'H'));
+        actionName = 'DNA 复制';
+        break;
+      case 'DNA_TRANS': // 核糖 + 脱氧
+        isCorrect = (sugarType === 'OH' && (!lastPlayedTile || prevSugar === 'H'));
+        actionName = 'DNA 转录';
+        break;
+      case 'RNA_REP': // 核糖 + 核糖
+        isCorrect = (sugarType === 'OH' && (!lastPlayedTile || prevSugar === 'OH'));
+        actionName = 'RNA 复制';
+        break;
+      case 'RNA_TRANS': // 脱氧 + 核糖
+        isCorrect = (sugarType === 'H' && (!lastPlayedTile || prevSugar === 'OH'));
+        actionName = 'RNA 逆转录';
+        break;
+    }
+
+    if (isCorrect) {
+      showToast(`${actionName}成功！`);
+      if (selectedIndices.length === 2) {
+        executePlay(playedTile, selectedIndices, playerHand);
+      } else {
+        executePlay(playedTile, selectedIndices, playerHand);
+      }
+      nextTurn();
+    } else {
+      showToast(`配对错误！这不是 ${actionName}`);
+      // 震动效果
+      anime({
+        targets: '#matrixBtns',
+        translateX: [0, -10, 10, -10, 10, 0],
+        duration: 400,
+        easing: 'easeInOutSine'
+      });
+    }
   }
 
   // 核心规则判断
@@ -819,13 +943,15 @@
         const sugar = isP1 ? t1.split('.')[1] : t2.split('.')[1];
         const base = isP1 ? t2.split('.')[1] : t1.split('.')[1];
         comboTile = `2.${sugar}.P.${base}`;
+        
+        showToast(`生化合成：${TILE_NAMES[comboTile]}`);
+        executeAutoComboPlay(comboTile, selectedIndices[0], playerHand);
+        nextTurn();
+        return; // 关键：合成后直接结束函数，防止进入下方的 executePlay
       }
     }
 
-    if (isAutoCombo) {
-      showToast(`生化合成：${TILE_NAMES[comboTile]}`);
-      executeAutoComboPlay(comboTile, selectedIndices[0], playerHand);
-    } else if (selectedIndices.length === 2) {
+    if (selectedIndices.length === 2) {
       const t1 = playerHand[selectedIndices[0]];
       const t2 = playerHand[selectedIndices[1]];
       const isP1 = t1.includes('.P');
@@ -1038,7 +1164,6 @@
     const bgStyle = TILE_IMAGES[tile] ? `style="background-image: url('${TILE_IMAGES[tile]}'); background-size: cover; background-position: center;"` : '';
     return `
       <div class="pai-tile" ${bgStyle}>
-        <div class="tile-level">${TILE_LEVELS[tile] || 2}</div>
         <div class="tile-name">${TILE_NAMES[tile] || '合成产物'}</div>
       </div>
     `;
