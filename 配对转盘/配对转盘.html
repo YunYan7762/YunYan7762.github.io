@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>核苷酸配对转盘 - 比例修正版</title>
+    <title>核苷酸配对转盘 - 双转盘挑战版</title>
     <script src="https://metis-online.fbcontent.cn/metis-misc/zgLDUdmazTYc0B4K6Cor.js"></script>
     <style>
         * {
@@ -19,19 +19,10 @@
             justify-content: center;
             align-items: center;
             font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-            overflow: hidden; /* 移除滚动条 */
+            overflow: hidden;
             touch-action: none;
         }
 
-        /* 
-           用户指定的精确像素比例 (已整体缩小至 30%，以适配 100% 页面缩放)：
-           R0 (中轴半径): 48.45px
-           W1 (内环宽度): 53.4px   -> R1 = 101.85px
-           W2 (中环宽度): 85.05px  -> R2 = 186.9px
-           W3 (外环宽度): 185.1px  -> R3 = 372px
-           
-           总直径 = 372 * 2 = 744px
-        */
         :root {
             --r0: 48.45px;
             --r1: 101.85px;
@@ -42,45 +33,36 @@
             --text: #74706e;
         }
 
+        /* 转盘容器基础样式 */
         .turntable-container {
-            position: relative;
+            position: absolute;
             width: 744px;
             height: 744px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: grab;
-            /* 移除强制缩放，现在 100% 缩放即可完美显示 */
             transform-origin: center center;
             flex-shrink: 0;
-            margin-right: 350px; 
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        @media (max-width: 1200px) {
-            .turntable-container {
-                transform: scale(0.8);
-                margin-right: 0;
-                margin-bottom: 200px;
-            }
-            .right-panel {
-                position: fixed;
-                bottom: 20px;
-                right: 50%;
-                transform: translateX(50%);
-                flex-direction: row;
-                top: auto;
-            }
-        }
+        /* 学习模式下的位置 */
+        body.mode-study #turntable-left { left: 50%; top: 50%; transform: translate(-50%, -50%) translateX(-175px); }
+        body.mode-study #turntable-right { display: none; }
 
-        @media (max-height: 800px) {
-            .turntable-container { transform: scale(0.8); }
-        }
+        /* 测试模式下的位置：一个只露右边，一个只露左边 */
+        body.mode-test #turntable-left { left: 0; top: 50%; transform: translate(-50%, -50%); }
+        body.mode-test #turntable-right { left: 100%; top: 50%; transform: translate(-50%, -50%); display: flex; }
 
-        .turntable-container:active {
-            cursor: grabbing;
-        }
+        /* 右转盘在测试模式下显示左半边，不翻转内容 */
+        body.mode-test #turntable-right .ring img { transform: none; }
+        body.mode-test #turntable-right .guide-line { transform-origin: right center; left: auto; right: 50%; }
+        body.mode-test #turntable-right .guide-arc { clip-path: polygon(50% 50%, 0% 29%, 0% 71%); }
 
-        /* 每一环的容器：通过 overflow:hidden 实现物理切割 */
+
+        .turntable-container:active { cursor: grabbing; }
+
         .ring {
             position: absolute;
             left: 50%;
@@ -93,84 +75,85 @@
             justify-content: center;
             transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
             background: #fff;
-            /* 蓝色分界线 */
             border: 2px solid #4a90e2; 
         }
 
-        .ring.dragging {
-            transition: none;
-        }
+        .ring.dragging { transition: none; }
+        .ring img { position: absolute; width: 744px; height: 744px; max-width: none; pointer-events: none; }
 
-        /* 核心：所有层都使用原图，并缩放至 744px 的逻辑空间 */
-        .ring img {
-            position: absolute;
-            width: 744px;
-            height: 744px;
-            max-width: none;
-            pointer-events: none;
-        }
+        .ring-outer { width: 744px; height: 744px; z-index: 10; }
+        .ring-middle { width: 373.8px; height: 373.8px; z-index: 20; }
+        .ring-inner { width: 203.7px; height: 203.7px; z-index: 30; }
+        .ring-center { width: 96.9px; height: 96.9px; z-index: 40; }
 
-        /* 容器尺寸设置 (直径) */
-        #ring-outer { width: 744px; height: 744px; z-index: 10; }
-        #ring-middle { width: 373.8px; height: 373.8px; z-index: 20; } /* R2 * 2 */
-        #ring-inner { width: 203.7px; height: 203.7px; z-index: 30; }   /* R1 * 2 */
-        #ring-center { width: 96.9px; height: 96.9px; z-index: 40; }    /* R0 * 2 */
-
-        /* 指示红线 */
-        .indicator-line {
+        .guide-line {
             position: absolute;
             left: 50%;
             top: 50%;
-            width: 372px;
+            width: 376px;
             height: 4px;
-            background: var(--primary);
+            background: #ff5600;
             transform-origin: left center;
-            transform: translateY(-50%);
             pointer-events: none;
-            z-index: 100;
-            opacity: 0;
+            z-index: 35;
         }
 
-        /* 右侧面板 */
-        .right-panel {
-            position: fixed;
-            right: 40px;
+        .guide-arc {
+            position: absolute;
+            left: 50%;
             top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            align-items: center;
+            width: calc((372px + 4px) * 2);
+            height: calc((372px + 4px) * 2);
+            border: 4px solid #ff5600;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 35;
+            clip-path: polygon(50% 50%, 100% 29%, 100% 71%);
+        }
+
+        /* 中央面板 */
+        .center-panel {
+            position: relative;
             z-index: 200;
-        }
-
-        .mode-switch {
             display: flex;
-            gap: 12px;
-            width: 100%;
+            flex-direction: row; /* 改回水平排列，以便侧边框位于两侧 */
+            align-items: center;
+            gap: 20px;
+            transition: all 0.8s ease;
         }
 
-        .mode-btn {
-            flex: 1;
-            padding: 12px 0;
-            border: 2px solid #e5e7eb;
+        body.mode-study .center-panel { transform: translateX(400px); }
+
+        .side-box {
+            width: 120px; /* 竖排按钮，宽度减小 */
             background: #ffffff;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 16px;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            display: none;
+            flex-direction: column; /* 竖排 */
+            align-items: center;
+            gap: 12px;
+            text-align: center;
+            position: relative;
+        }
+
+        .side-box::before {
+            content: attr(data-hint);
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
             font-weight: bold;
-            color: var(--text);
-            transition: all 0.3s ease;
+            color: var(--primary);
+            white-space: nowrap;
         }
 
-        .mode-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(255, 86, 0, 0.2);
-        }
+        body.mode-test .side-box { display: flex; }
 
-        .result-container {
+        .main-result-container {
             width: 320px;
             min-height: 480px;
             background: #ffffff;
@@ -183,109 +166,130 @@
             text-align: center;
         }
 
-        .result-title {
-            font-weight: bold;
-            font-size: 20px;
-            color: #0c0302;
-            border-bottom: 2px solid #f4f3ec;
-            padding-bottom: 12px;
-        }
+        .mode-switch { display: flex; gap: 12px; width: 100%; margin-bottom: 10px; }
+        .mode-btn { flex: 1; padding: 12px 0; border: 2px solid #e5e7eb; background: #ffffff; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: bold; color: var(--text); transition: all 0.3s ease; }
+        .mode-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-        .result-list {
-            flex: 1;
-            font-size: 18px;
-            color: var(--text);
-            line-height: 1.6;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
+        .result-title { font-weight: bold; font-size: 20px; color: #0c0302; border-bottom: 2px solid #f4f3ec; padding-bottom: 12px; }
+        .result-list { flex: 1; font-size: 18px; color: var(--text); line-height: 1.6; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 
         .highlight-name { color: var(--primary); font-weight: 600; }
         .nucleotide-name { color: var(--primary); font-weight: bold; }
         .status-success { color: var(--secondary); font-weight: bold; margin-top: 12px; font-size: 20px; }
         .status-fail { color: #dc2626; font-weight: bold; margin-top: 12px; }
 
-        #btnConfirm {
-            width: 100%;
-            padding: 16px;
-            background: var(--secondary);
-            color: white;
-            border: none;
-            border-radius: 16px;
-            cursor: pointer;
-            font-size: 18px;
-            font-weight: bold;
-            display: none;
-            transition: all 0.3s ease;
-        }
+        .stop-btns { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+        .stop-btn { width: 100%; padding: 10px 0; background: #e5e7eb; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; color: var(--text); }
+        .stop-btn.stopped { background: #dc2626; color: white; }
 
-        .hint {
+        .confirm-btn { width: 100%; padding: 12px 0; background: var(--secondary); color: white; border: none; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.3s ease; }
+        .timer-display { font-size: 18px; font-weight: bold; color: var(--primary); font-family: monospace; margin-bottom: 5px; }
+
+        /* 顶部弹窗样式 */
+        #toast-container {
             position: fixed;
-            top: 30px;
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 12px 24px;
-            border-radius: 100px;
-            font-size: 14px;
-            color: var(--text);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            z-index: 200;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
         }
+
+        .toast {
+            background: rgba(255, 255, 255, 0.95);
+            border-left: 5px solid var(--secondary);
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            font-weight: bold;
+            color: #333;
+            animation: toast-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+            pointer-events: auto;
+        }
+
+        @keyframes toast-in {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .toast.fade-out {
+            animation: toast-out 0.5s ease forwards;
+        }
+
+        @keyframes toast-out {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(-20px); opacity: 0; }
+        }
+
+        #btnStart { width: 100%; padding: 16px; background: #dc2626; color: white; border: none; border-radius: 16px; cursor: pointer; font-size: 18px; font-weight: bold; display: none; }
     </style>
 </head>
-<body>
+<body class="mode-study">
 
-    <div class="turntable-container" id="turntableRoot">
-        <!-- 外环 (1200px) -->
-        <div class="ring" id="ring-outer">
-            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg" alt="外环">
-        </div>
-        <!-- 中环 (920px) -->
-        <div class="ring" id="ring-middle">
-            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg" alt="中环">
-        </div>
-        <!-- 内环 (480px) -->
-        <div class="ring" id="ring-inner">
-            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg" alt="内环">
-        </div>
-        <!-- 中轴 (200px) -->
-        <div class="ring" id="ring-center">
-            <img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg" alt="中轴">
-        </div>
-        
-        <!-- 指示线 -->
-        <div class="indicator-line"></div>
+    <!-- 左转盘 -->
+    <div class="turntable-container" id="turntable-left">
+        <div class="ring ring-outer"><img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg"></div>
+        <div class="ring ring-middle"><img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg"></div>
+        <div class="ring ring-inner"><img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg"></div>
+        <div class="ring ring-center"><img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg"></div>
+        <div class="guide-line" style="transform: translateY(-50%) rotate(23deg);"></div>
+        <div class="guide-line" style="transform: translateY(-50%) rotate(-23deg);"></div>
+        <div class="guide-arc"></div>
     </div>
 
-    <div class="right-panel">
-        <div class="mode-switch">
-            <button class="mode-btn active" id="btnStudy">学习模式</button>
-            <button class="mode-btn" id="btnTest">测试模式</button>
-        </div>
-        <div class="result-container">
-            <div class="result-title" id="containerTitle">碰撞检测结果</div>
-            <div class="result-list" id="resultList">
-                <div style="color: #999; font-size: 14px;">旋转圆环使结构与红线重合...</div>
+    <!-- 右转盘 -->
+    <div class="turntable-container" id="turntable-right">
+        <div class="ring ring-outer"><img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/psJNJwt4kKVTM22jvznvMG.jpg"></div>
+        <div class="ring ring-middle"><img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/h6tzXXrrnksTgwgeUABuNH.jpg"></div>
+        <div class="ring ring-inner"><img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg"></div>
+        <div class="ring ring-center"><img src="https://musk-online.fbcontent.cn/pub-musk-ai-studio/user/upload/20/CRNVe3zmFwdejmnzDgWj2S.jpg"></div>
+        <div class="guide-line" style="transform: translateY(-50%) rotate(23deg);"></div>
+        <div class="guide-line" style="transform: translateY(-50%) rotate(-23deg);"></div>
+        <div class="guide-arc"></div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <div class="center-panel">
+        <!-- 左控制框 -->
+        <div class="side-box" id="box-left" data-hint="检测：鼠标点击">
+            <div class="timer-display" id="timer-left">00:00.00</div>
+            <div class="stop-btns">
+                <button class="stop-btn" data-side="left" data-ring="inner">内环</button>
+                <button class="stop-btn" data-side="left" data-ring="middle">中环</button>
+                <button class="stop-btn" data-side="left" data-ring="outer">外环</button>
             </div>
-            <button id="btnConfirm">确认配对</button>
+            <button class="confirm-btn" id="btnConfirm-left">确认左</button>
+        </div>
+
+        <!-- 主结果框 -->
+        <div class="main-result-container">
+            <div class="mode-switch">
+                <button class="mode-btn active" id="btnStudy">学习模式</button>
+                <button class="mode-btn" id="btnTest">测试模式</button>
+            </div>
+            <div class="result-title" id="containerTitle">碰撞检测结果</div>
+            <div class="result-list" id="resultList">旋转圆环进行配对...</div>
+            <button id="btnStart">开始</button>
+        </div>
+
+        <!-- 右控制框 -->
+        <div class="side-box" id="box-right" data-hint="检测：空格键">
+            <div class="timer-display" id="timer-right">00:00.00</div>
+            <div class="stop-btns">
+                <button class="stop-btn" data-side="right" data-ring="inner">内环</button>
+                <button class="stop-btn" data-side="right" data-ring="middle">中环</button>
+                <button class="stop-btn" data-side="right" data-ring="outer">外环</button>
+            </div>
+            <button class="confirm-btn" id="btnConfirm-right">确认右</button>
         </div>
     </div>
 
     <script>
         (function() {
-            const root = document.getElementById('turntableRoot');
-            const resultList = document.getElementById('resultList');
-            const btnStudy = document.getElementById('btnStudy');
-            const btnTest = document.getElementById('btnTest');
-            const btnConfirm = document.getElementById('btnConfirm');
-            const containerTitle = document.getElementById('containerTitle');
-
-            let currentMode = 'study'; 
-            let testTarget = null; 
-
             const nameMap = {
                 'H': '脱氧核糖', 'OH': '核糖',
                 'A': '腺嘌呤', 'G': '鸟嘌呤', 'C': '胞嘧啶', 'T': '胸腺嘧啶', 'U': '尿嘧啶',
@@ -293,11 +297,29 @@
                 'A-OH': '腺嘌呤核糖核苷酸', 'G-OH': '鸟嘌呤核糖核苷酸', 'C-OH': '胞嘧啶核糖核苷酸', 'U-OH': '尿嘧啶核糖核苷酸'
             };
 
+            const R_CENTER = 48.45, R_INNER = 101.85, R_MIDDLE = 186.9, R_OUTER = 372;
+            let currentMode = 'study', isRolling = false;
+            let testTarget = null, testInterval = null;
+
+            const state = {
+                left: { angle: { inner: 0, middle: 0, outer: 0 }, rotating: { inner: false, middle: false, outer: false }, startTime: 0, timerInterval: null },
+                right: { angle: { inner: 0, middle: 0, outer: 0 }, rotating: { inner: false, middle: false, outer: false }, startTime: 0, timerInterval: null }
+            };
+
+            const ringData = {
+                inner: { points: ['H', 'OH', 'H', 'OH', 'H', 'OH', 'H', 'OH'], startAngle: 157.5 },
+                middle: { points: ['A', 'C', 'T', 'G', 'A', 'C', 'U', 'G'], startAngle: 292.5 },
+                outer: { points: ['T-H', 'G-OH', 'A-H', 'C-OH', 'U-OH', 'G-H', 'A-OH', 'C-H'], startAngle: 292.5 }
+            };
+
+            function getPointAngles(key) {
+                return ringData[key].points.map((_, i) => ringData[key].startAngle + i * 45 + 22.5);
+            }
+
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             function playSnapSound() {
                 if (audioCtx.state === 'suspended') audioCtx.resume();
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
+                const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
                 osc.type = 'sine'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
                 gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
@@ -305,181 +327,263 @@
                 osc.start(); osc.stop(audioCtx.currentTime + 0.1);
             }
 
-            // 修正后的半径参数 (已整体缩小至 30%)
-            const R_CENTER = 48.45;
-            const R_INNER = 101.85;
-            const R_MIDDLE = 186.9;
-            const R_OUTER = 372;
-
-            const rings = {
-                inner: { 
-                    el: document.getElementById('ring-inner'), 
-                    angle: 0, 
-                    points: ['H', 'OH', 'H', 'OH', 'H', 'OH', 'H', 'OH'],
-                    startAngle: 157.5
-                },
-                middle: { 
-                    el: document.getElementById('ring-middle'), 
-                    angle: 0, 
-                    points: [ 'A' , 'C' , 'T' , 'G' , 'A' , 'C' , 'U' , 'G'],
-                    startAngle: 292.5
-                },
-                outer: { 
-                    el: document.getElementById('ring-outer'), 
-                    angle: 0, 
-                    points: [ 'T-H' , 'G-OH' , 'A-H' , 'C-OH' , 'U-OH' ,  'G-H' , 'A-OH' , 'C-H' ],
-                    startAngle: 292.5
-                }
-            };
-
-            function initPoints() {
-                Object.keys(rings).forEach(key => {
-                    const ring = rings[key];
-                    ring.pointAngles = ring.points.map((_, i) => ring.startAngle + i * 45 + 22.5);
-                });
+            function updateRingUI(side, ringKey) {
+                const el = document.querySelector(`#turntable-${side} .ring-${ringKey}`);
+                el.style.transform = `translate(-50%, -50%) rotate(${state[side].angle[ringKey]}deg)`;
             }
-            initPoints();
 
-            function checkCollisions() {
+            function checkCollisions(side = 'left') {
                 let collisions = { inner: [], middle: [], outer: [] };
-                Object.keys(rings).forEach(key => {
-                    const ring = rings[key];
-                    ring.pointAngles.forEach((baseAngle, i) => {
-                        let currentAngle = (baseAngle + ring.angle) % 360;
+                ['inner', 'middle', 'outer'].forEach(key => {
+                    const angles = getPointAngles(key);
+                    angles.forEach((baseAngle, i) => {
+                        let currentAngle = (baseAngle + state[side].angle[key]) % 360;
                         if (currentAngle < 0) currentAngle += 360;
-                        let diff = Math.abs(currentAngle - 0);
+                        const targetAngle = (side === 'left' ? 0 : 180);
+                        let diff = Math.abs(currentAngle - targetAngle);
                         if (diff > 180) diff = 360 - diff;
-                        if (diff <= 22.5) collisions[key].push(ring.points[i]);
+                        if (diff <= 22.5) collisions[key].push(ringData[key].points[i]);
                     });
                 });
-                updateResultUI(collisions);
+                if (currentMode === 'study') updateStudyUI(collisions);
             }
 
-            function updateResultUI(collisions) {
+            function updateStudyUI(collisions) {
                 const p1 = collisions.inner[0], p2 = collisions.middle[0], p3 = collisions.outer[0];
-                if (currentMode === 'study') {
-                    if (!p1 && !p2 && !p3) {
-                        resultList.innerHTML = '<div style="color: #999; font-size: 14px;">旋转圆环进行配对...</div>';
-                        return;
-                    }
-                    let html = '<div class="result-group">';
-                    if (p1 && p2) {
-                        html += `<span class="highlight-name">${nameMap[p1]}</span><br>+<br><span class="highlight-name">${nameMap[p2]}</span><br>↓<br>`;
-                        const isFail = (p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H');
-                        if (isFail) html += `<span class="status-fail">组合失败：${p2}不与${nameMap[p1]}结合</span>`;
-                        else {
-                            html += `<span class="nucleotide-name">${nameMap[p2]}${p1 === 'H' ? '脱氧核糖' : '核糖'}核苷酸</span>`;
-                            if (p3) {
-                                html += `<br><div style="margin:10px 0; border-top:1px dashed #ddd;"></div>与外环配对：<br><span class="highlight-name">${nameMap[p3]}</span><br>`;
-                                const p3Base = p3.split('-')[0], pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
-                                if (pairMap[p3Base] && pairMap[p3Base].includes(p2)) html += `<span class="status-success">★ 碱基互补配对成功</span>`;
-                                else html += `<span class="status-fail">配对不成功</span>`;
-                            }
+                const resultList = document.getElementById('resultList');
+                if (!p1 && !p2 && !p3) { resultList.innerHTML = '旋转圆环进行配对...'; return; }
+                let html = '<div class="result-group">';
+                if (p1 && p2) {
+                    html += `<span class="highlight-name">${nameMap[p1]}</span><br>+<br><span class="highlight-name">${nameMap[p2]}</span><br>↓<br>`;
+                    const isFail = (p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H');
+                    if (isFail) html += `<span class="status-fail">组合失败</span>`;
+                    else {
+                        html += `<span class="nucleotide-name">${nameMap[p2]}${p1 === 'H' ? '脱氧核糖' : '核糖'}核苷酸</span>`;
+                        if (p3) {
+                            const p3Base = p3.split('-')[0], pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
+                            html += `<br>与外环<br><span class="highlight-name">${nameMap[p3]}</span><br>`;
+                            if (pairMap[p3Base] && pairMap[p3Base].includes(p2)) {
+                                const p3Sugar = p3.split('-')[1];
+                                let txt = '配对成功';
+                                if (p1 === 'H' && p3Sugar === 'H') txt = 'DNA配对成功';
+                                else if (p1 === 'H' && p3Sugar === 'OH') txt = 'DNA转录成功';
+                                else if (p1 === 'OH' && p3Sugar === 'OH') txt = '蛋白质合成成功';
+                                else if (p1 === 'OH' && p3Sugar === 'H') txt = 'RNA逆转录成功';
+                                html += `<span class="status-success">${txt}</span>`;
+                            } else html += `<span class="status-fail">配对不成功</span>`;
                         }
-                    } else {
-                        if (p1) html += `内环：<span class="highlight-name">${nameMap[p1]}</span><br>`;
-                        if (p2) html += `中环：<span class="highlight-name">${nameMap[p2]}</span><br>`;
-                        if (p3) html += `外环：<span class="highlight-name">${nameMap[p3]}</span><br>`;
                     }
-                    html += '</div>';
-                    resultList.innerHTML = html;
-                } else {
-                    let html = '<div class="result-group">';
-                    html += '请配对：<br>';
-                    html += `<span class="highlight-name">${nameMap[testTarget.p1]}</span><br>+<br><span class="highlight-name">${nameMap[testTarget.p2]}</span><br>↓<br>`;
-                    html += `<span class="nucleotide-name">${nameMap[testTarget.p2]}${testTarget.p1 === 'H' ? '脱氧核糖' : '核糖'}核苷酸</span><br>与<br>`;
-                    html += `<span class="highlight-name">${nameMap[testTarget.p3]}</span><br>配对`;
-                    html += '</div>';
-                    resultList.innerHTML = html;
                 }
+                resultList.innerHTML = html + '</div>';
             }
 
-            btnStudy.onclick = () => {
-                currentMode = 'study'; btnStudy.classList.add('active'); btnTest.classList.remove('active');
-                btnConfirm.style.display = 'none'; containerTitle.innerText = '学习模式 - 详细解析'; checkCollisions();
-            };
+            function updateTestUI() {
+                if (!testTarget) return;
+                const { p1, p2, p3 } = testTarget;
+                const p3Sugar = p3.split('-')[1];
+                let successText = '配对成功';
+                if (p1 === 'H' && p3Sugar === 'H') successText = 'DNA配对成功';
+                else if (p1 === 'H' && p3Sugar === 'OH') successText = 'DNA转录成功';
+                else if (p1 === 'OH' && p3Sugar === 'OH') successText = '蛋白质合成成功';
+                else if (p1 === 'OH' && p3Sugar === 'H') successText = 'RNA逆转录成功';
 
-            btnTest.onclick = () => {
-                currentMode = 'test'; btnTest.classList.add('active'); btnStudy.classList.remove('active');
-                btnConfirm.style.display = 'block'; containerTitle.innerText = '测试模式 - 挑战目标';
-                testTarget = (function() {
-                    const sugars = ['H', 'OH'], bases = ['A', 'G', 'C', 'T', 'U'];
-                    let p1, p2, p3, isValid = false;
-                    while (!isValid) {
-                        p1 = sugars[Math.floor(Math.random() * 2)]; p2 = bases[Math.floor(Math.random() * 5)];
-                        if ((p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H')) continue;
-                        const pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
-                        const p3Base = pairMap[p2][Math.floor(Math.random() * pairMap[p2].length)];
-                        const possibleP3 = rings.outer.points.filter(p => p.startsWith(p3Base));
-                        if (possibleP3.length > 0) { p3 = possibleP3[Math.floor(Math.random() * possibleP3.length)]; isValid = true; }
-                    }
-                    return { p1, p2, p3 };
-                })();
+                document.getElementById('resultList').innerHTML = `
+                    <div class="result-group">
+                        ${isRolling ? '随机抽取目标中...' : '请配对：'}<br>
+                        <span class="highlight-name">${nameMap[p1]}</span> + <span class="highlight-name">${nameMap[p2]}</span><br>↓<br>
+                        <span class="nucleotide-name">${nameMap[p2]}${p1 === 'H' ? '脱氧核糖' : '核糖'}核苷酸</span><br>
+                        与外环 <br> <span class="highlight-name">${nameMap[p3]}</span> <br>
+                        <span class="status-success">${successText}</span>
+                    </div>`;
+            }
+
+            function startRolling() {
+                isRolling = true;
+                const btnStart = document.getElementById('btnStart');
+                btnStart.style.display = 'block';
+                const sugars = ['H', 'OH'], bases = ['A', 'G', 'C', 'T', 'U'], pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'G': ['C'], 'C': ['G'] };
+                testInterval = setInterval(() => {
+                    const p1 = sugars[Math.floor(Math.random() * 2)], p2 = bases[Math.floor(Math.random() * 5)];
+                    if ((p2 === 'T' && p1 === 'OH') || (p2 === 'U' && p1 === 'H')) return;
+                    const p3Base = pairMap[p2][Math.floor(Math.random() * pairMap[p2].length)];
+                    const p3 = ringData.outer.points.filter(p => p.startsWith(p3Base))[0];
+                    testTarget = { p1, p2, p3 };
+                    updateTestUI();
+                }, 250);
+            }
+
+            let globalRotationInterval = null;
+            function startGlobalRotation() {
+                globalRotationInterval = setInterval(() => {
+                    ['left', 'right'].forEach(side => {
+                        ['inner', 'middle', 'outer'].forEach(ring => {
+                            if (state[side].rotating[ring]) {
+                                state[side].angle[ring] += (side === 'left' ? 45 : 45); 
+                                updateRingUI(side, ring);
+                            }
+                        });
+                    });
+                    playSnapSound();
+                }, 500);
+            }
+
+            function startTimer(side) {
+                state[side].startTime = Date.now();
+                const el = document.getElementById(`timer-${side}`);
+                state[side].timerInterval = setInterval(() => {
+                    const elapsed = Date.now() - state[side].startTime;
+                    const m = Math.floor(elapsed / 60000), s = Math.floor((elapsed % 60000) / 1000), ms = Math.floor((elapsed % 1000) / 10);
+                    el.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                }, 50);
+            }
+
+            document.getElementById('btnStudy').onclick = () => {
+                currentMode = 'study'; document.body.className = 'mode-study';
+                document.getElementById('btnStudy').classList.add('active'); document.getElementById('btnTest').classList.remove('active');
+                document.getElementById('btnStart').style.display = 'none';
+                clearInterval(testInterval); clearInterval(globalRotationInterval);
+                ['left', 'right'].forEach(s => clearInterval(state[s].timerInterval));
                 checkCollisions();
             };
 
-            btnConfirm.onclick = () => {
-                let cur = { inner: null, middle: null, outer: null };
-                Object.keys(rings).forEach(key => {
-                    const ring = rings[key];
-                    ring.pointAngles.forEach((baseAngle, i) => {
-                        let currentAngle = (baseAngle + ring.angle) % 360;
-                        if (currentAngle < 0) currentAngle += 360;
-                        if (Math.abs(currentAngle - 0) < 5 || Math.abs(currentAngle - 360) < 5) cur[key] = ring.points[i];
-                    });
-                });
-                if (cur.inner === testTarget.p1 && cur.middle === testTarget.p2 && cur.outer === testTarget.p3) alert('🎉 恭喜！配对完全正确！');
-                else alert('❌ 配对不一致，请继续调整转盘。');
+            document.getElementById('btnTest').onclick = () => {
+                currentMode = 'test'; document.body.className = 'mode-test';
+                document.getElementById('btnTest').classList.add('active'); document.getElementById('btnStudy').classList.remove('active');
+                startRolling();
             };
 
-            let activeRing = null, startMouseAngle = 0, startRingAngle = 0;
-            function getMouseAngle(e) {
-                const rect = root.getBoundingClientRect();
-                const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
-                return Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI);
+            document.getElementById('btnStart').onclick = () => {
+                isRolling = false; clearInterval(testInterval);
+                document.getElementById('btnStart').style.display = 'none';
+                updateTestUI();
+                ['left', 'right'].forEach(side => {
+                    ['inner', 'middle', 'outer'].forEach(r => state[side].rotating[r] = true);
+                    document.querySelectorAll(`.stop-btn[data-side="${side}"]`).forEach(b => { b.classList.remove('stopped'); b.innerText = b.innerText.replace(' (已停止)', ''); });
+                    startTimer(side);
+                });
+                startGlobalRotation();
+            };
+
+            document.querySelectorAll('.stop-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const side = btn.dataset.side, ring = btn.dataset.ring;
+                    if (state[side].rotating[ring]) {
+                        state[side].rotating[ring] = false;
+                        btn.classList.add('stopped');
+                        btn.innerText = btn.innerText.replace(' (已停止)', '') + ' (已停止)';
+                    } else {
+                        state[side].rotating[ring] = true;
+                        btn.classList.remove('stopped');
+                        btn.innerText = btn.innerText.replace(' (已停止)', '');
+                    }
+                };
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if (currentMode === 'test' && !isRolling && e.code === 'Space') {
+                    e.preventDefault();
+                    // 依次触发内环、中环、外环停止，最后触发确认
+                    const rings = ['inner', 'middle', 'outer'];
+                    let handled = false;
+                    for (const ring of rings) {
+                        if (state.right.rotating[ring]) {
+                            state.right.rotating[ring] = false;
+                            const btn = document.querySelector(`.stop-btn[data-side="right"][data-ring="${ring}"]`);
+                            if (btn) {
+                                btn.classList.add('stopped');
+                                btn.innerText = btn.innerText.replace(' (已停止)', '') + ' (已停止)';
+                            }
+                            handled = true;
+                            break;
+                        }
+                    }
+                    if (!handled) {
+                        handleConfirm('right');
+                    }
+                }
+            });
+
+            function showToast(message) {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.innerText = message;
+                container.appendChild(toast);
+                setTimeout(() => {
+                    toast.classList.add('fade-out');
+                    setTimeout(() => toast.remove(), 500);
+                }, 3000);
             }
+
+            function handleConfirm(side) {
+                let cur = { inner: null, middle: null, outer: null };
+                ['inner', 'middle', 'outer'].forEach(key => {
+                    const angles = getPointAngles(key);
+                    angles.forEach((baseAngle, i) => {
+                        let currentAngle = (baseAngle + state[side].angle[key]) % 360;
+                        if (currentAngle < 0) currentAngle += 360;
+                        const targetAngle = (side === 'left' ? 0 : 180);
+                        let diff = Math.abs(currentAngle - targetAngle);
+                        if (diff > 180) diff = 360 - diff;
+                        if (diff < 5) cur[key] = ringData[key].points[i];
+                    });
+                });
+                if (cur.inner === testTarget.p1 && cur.middle === testTarget.p2 && cur.outer === testTarget.p3) {
+                    clearInterval(state[side].timerInterval);
+                    showToast(`🎉 ${side === 'left' ? '左' : '右'}转盘配对成功！用时：${document.getElementById(`timer-${side}`).innerText}`);
+                } else {
+                    showToast(`❌ ${side === 'left' ? '左' : '右'}转盘配对不一致，请继续调整。`);
+                }
+            }
+
+            document.getElementById('btnConfirm-left').onclick = () => handleConfirm('left');
+            document.getElementById('btnConfirm-right').onclick = () => handleConfirm('right');
+
+            // 拖拽逻辑
+            let activeSide = null, activeRing = null, startMouseAngle = 0, startRingAngle = 0;
+            function getMouseAngle(e, cx, cy) { return Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI); }
 
             function handleStart(e) {
-                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-                const rect = root.getBoundingClientRect();
-                const dx = clientX - (rect.left + rect.width / 2), dy = clientY - (rect.top + rect.height / 2);
-                const dist = Math.sqrt(dx * dx + dy * dy); // 100% 缩放，无需还原缩放系数
-
-                if (dist < R_CENTER) return;
-                else if (dist < R_INNER) activeRing = rings.inner;
-                else if (dist < R_MIDDLE) activeRing = rings.middle;
-                else if (dist < R_OUTER) activeRing = rings.outer;
-                else return;
-
-                startMouseAngle = getMouseAngle({ clientX, clientY });
-                startRingAngle = activeRing.angle;
-                activeRing.el.classList.add('dragging');
-
-                const moveHandler = (me) => {
-                    if (!activeRing) return;
-                    const mX = me.clientX || (me.touches && me.touches[0].clientX), mY = me.clientY || (me.touches && me.touches[0].clientY);
-                    activeRing.angle = startRingAngle + (getMouseAngle({ clientX: mX, clientY: mY }) - startMouseAngle);
-                    activeRing.el.style.transform = `translate(-50%, -50%) rotate(${activeRing.angle}deg)`;
-                    if (currentMode === 'study') checkCollisions();
-                };
-
-                const endHandler = () => {
-                    if (activeRing) {
-                        activeRing.el.classList.remove('dragging');
-                        const step = 45, base = activeRing.pointAngles[0];
-                        activeRing.angle = Math.round((activeRing.angle + base) / step) * step - base;
-                        activeRing.el.style.transform = `translate(-50%, -50%) rotate(${activeRing.angle}deg)`;
-                        playSnapSound(); setTimeout(checkCollisions, 600);
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX), clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                ['left', 'right'].forEach(side => {
+                    const el = document.getElementById(`turntable-${side}`);
+                    if (currentMode === 'study' && side === 'right') return;
+                    const rect = el.getBoundingClientRect(), cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+                    const dx = clientX - cx, dy = clientY - cy, dist = Math.sqrt(dx * dx + dy * dy);
+                    let ring = null;
+                    if (dist < R_CENTER) return;
+                    else if (dist < R_INNER) ring = 'inner';
+                    else if (dist < R_MIDDLE) ring = 'middle';
+                    else if (dist < R_OUTER) ring = 'outer';
+                    if (ring) {
+                        activeSide = side; activeRing = ring;
+                        startMouseAngle = getMouseAngle({ clientX, clientY }, cx, cy);
+                        startRingAngle = state[side].angle[ring];
+                        el.querySelector(`.ring-${ring}`).classList.add('dragging');
+                        
+                        const move = (me) => {
+                            const mX = me.clientX || (me.touches && me.touches[0].clientX), mY = me.clientY || (me.touches && me.touches[0].clientY);
+                            state[activeSide].angle[activeRing] = startRingAngle + (getMouseAngle({ clientX: mX, clientY: mY }, cx, cy) - startMouseAngle);
+                            updateRingUI(activeSide, activeRing);
+                            if (currentMode === 'study') checkCollisions();
+                        };
+                        const end = () => {
+                            const ringEl = el.querySelector(`.ring-${activeRing}`);
+                            ringEl.classList.remove('dragging');
+                            const step = 45, base = getPointAngles(activeRing)[0];
+                            state[activeSide].angle[activeRing] = Math.round((state[activeSide].angle[activeRing] + base) / step) * step - base;
+                            updateRingUI(activeSide, activeRing);
+                            playSnapSound(); checkCollisions(activeSide);
+                            activeSide = activeRing = null;
+                            document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', end);
+                            document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end);
+                        };
+                        document.addEventListener('mousemove', move); document.addEventListener('mouseup', end);
+                        document.addEventListener('touchmove', move, { passive: false }); document.addEventListener('touchend', end);
                     }
-                    activeRing = null;
-                    document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', endHandler);
-                    document.removeEventListener('touchmove', moveHandler); document.removeEventListener('touchend', endHandler);
-                };
-                document.addEventListener('mousemove', moveHandler); document.addEventListener('mouseup', endHandler);
-                document.addEventListener('touchmove', moveHandler, { passive: false }); document.addEventListener('touchend', endHandler);
+                });
             }
-            root.addEventListener('mousedown', handleStart); root.addEventListener('touchstart', handleStart, { passive: false });
+            document.addEventListener('mousedown', handleStart); document.addEventListener('touchstart', handleStart, { passive: false });
             checkCollisions();
         })();
     </script>
