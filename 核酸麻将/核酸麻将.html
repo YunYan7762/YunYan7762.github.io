@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>核酸大作战 - 麻将教学版</title>
+  
+  <!-- 外部库引入 -->
+  <script src="https://metis-online.fbcontent.cn/metis-misc/zgLDUdmazTYc0B4K6Cor.js"></script>
+  <script src="https://metis-online.fbcontent.cn/metis-misc/zZZY40t7WJC7UdQCPACm.js"></script>
+  
+  <style>
+    /* 基础样式 */
+    body {
+      font-family: 'Noto Serif SC', serif;
+      background: #0a2e1f; /* 深绿色背景，模拟麻将桌布 */
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      color: #EBEDD4;
+      user-select: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* 游戏布局  */
+    .game-layout {
+      display: grid;
+      grid-template-areas: 
+        ". top ."
+        "left center right"
+        ". bottom .";
+      grid-template-columns: 140px 1fr 140px;
+      grid-template-rows: 60px 1fr 170px; /* 使用 1fr 确保中间区域占据所有剩余空间 */
+      height: 100vh;
+      width: 100vw;
+      padding: 5px;
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    /* 区域定义 */
+    .top-area { grid-area: top; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .left-area { grid-area: left; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .right-area { grid-area: right; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .bottom-area { grid-area: bottom; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; position: relative; padding-bottom: 10px; }
+    
+    /* 中心桌子区域 - 极致压缩高度 */
+    .center-area { 
+      grid-area: center; 
+      position: relative; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: flex-start; /* 从顶部开始排列，防止内容居中导致的跳动 */
+      border: 5px solid #1a4d36; 
+      border-radius: 20px; 
+      margin: 2px 10px; 
+      background: #143d2a; 
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.5), 0 3px 8px rgba(0,0,0,0.5);
+      overflow: hidden;
+      height: 100%; 
+      box-sizing: border-box;
+      padding: 10px 0;
+    }
+
+    /* 玩家信息卡片 - 缩小尺寸 */
+    .player-box {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1.5px solid #AE7645;
+      border-radius: 8px;
+      padding: 2px 6px;
+      text-align: center;
+      min-width: 70px;
+      transition: all 0.3s;
+      z-index: 50;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .player-box.active-turn {
+      border-color: #F59E0B;
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.8);
+      background: rgba(245, 158, 11, 0.2);
+      transform: scale(1.03);
+    }
+    .avatar { width: 20px; height: 20px; background: #AE7645; border-radius: 50%; margin: 0 auto 1px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 9px; }
+    .card-count { font-size: 9px; color: #F59E0B; font-weight: bold; }
+
+    /* 弃牌区 - 增加列数，增大单牌尺寸 */
+    .discard-pile {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr); 
+      gap: 6px;
+      width: 98%;
+      flex: 1; /* 占据剩余所有空间 */
+      min-height: 0; /* 关键：允许 flex 项目缩小 */
+      overflow-y: auto;
+      padding: 10px;
+      justify-items: center;
+      scrollbar-gutter: stable; /* 防止滚动条出现时页面抖动 */
+    }
+    .discard-tile {
+      width: 52px;
+      height: 72px;
+      background: #EBEDD4;
+      border: 1px solid #AE7645;
+      border-radius: 2px;
+      background-size: cover;
+      background-position: center;
+      position: relative;
+      box-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+    }
+    /* 移除弃牌区左上角数字显示 */
+    .discard-tile::after {
+        display: none;
+    }
+
+    /* 手牌区 - 调整至适中大小，确保不拥挤 */
+    .hand-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 2px;
+      height: 130px; 
+      padding: 0 5px;
+    }
+    .exposed-group {
+      display: flex;
+      gap: 2px;
+      margin-left: 15px;
+      padding: 2px;
+      border: 1px dashed rgba(174, 118, 69, 0.5);
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.1);
+    }
+    .pai-tile {
+      width: 72px; 
+      height: 100px; 
+      background: #EBEDD4;
+      border: 1.5px solid #AE7645;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #021502;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      background-size: cover;
+      background-position: center;
+      position: relative;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+    }
+    .pai-tile:hover { transform: translateY(-12px); z-index: 100; }
+    .pai-tile.selected { transform: translateY(-25px); border-color: #DC2626; box-shadow: 0 8px 20px rgba(220, 38, 38, 0.6); z-index: 110; }
+    .pai-tile.candidate { border-color: #F59E0B; box-shadow: 0 0 15px #F59E0B; transform: translateY(-5px); }
+    .pai-tile.eat-selected { border-color: #10B981; box-shadow: 0 0 15px #10B981; transform: translateY(-15px); z-index: 105; }
+    .pai-tile.disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.5); }
+    
+    .tile-val { display: none; }
+
+    /* AI 手牌 (背面) - 缩小 */
+    .ai-hand-back { display: flex; gap: 1px; margin-top: 2px; }
+    .tile-back {
+      width: 22px;
+      height: 30px;
+      background: linear-gradient(135deg, #2D593E, #1D422B);
+      border: 1px solid #AE7645;
+      border-radius: 2px;
+      box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+    .left-area .ai-hand-back, .right-area .ai-hand-back { flex-direction: column; }
+
+    /* 按钮区 */
+    .action-bar {
+      position: absolute;
+      left: 50%;
+      top: -60px;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 200;
+    }
+    .btn {
+      padding: 8px 24px;
+      border-radius: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      border: 2px solid #AE7645;
+      transition: all 0.2s;
+      font-size: 16px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+    .btn-eat { background: linear-gradient(to bottom, #F59E0B, #D97706); color: #021502; }
+    .btn-hu { background: linear-gradient(to bottom, #DC2626, #991B1B); color: white; border-color: white; }
+    .btn-pass { background: linear-gradient(to bottom, #4B5563, #1F2937); color: white; }
+    .btn:hover:not(:disabled) { transform: scale(1.05); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* 提示框 */
+    #toast {
+      position: fixed;
+      top: 35%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(245, 158, 11, 0.95);
+      color: #021502;
+      padding: 12px 35px;
+      border-radius: 25px;
+      font-weight: bold;
+      font-size: 24px;
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.7);
+      border: 2px solid #021502;
+    }
+
+    /* 结算弹窗 */
+    .modal {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      backdrop-filter: blur(8px);
+    }
+    .modal-content {
+      background: #EBEDD4;
+      padding: 25px;
+      border-radius: 15px;
+      text-align: center;
+      color: #021502;
+      max-width: 350px;
+      border: 3px solid #AE7645;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.6);
+    }
+    .modal-content h2 { font-size: 28px; margin-top: 0; color: #2D593E; }
+    .modal-content p { font-size: 15px; margin: 12px 0 20px; }
+  </style>
+</head>
+<body>
+
+<div class="game-layout">
+  <!-- 顶部 AI 2 -->
+  <div class="top-area">
+    <div class="player-box" id="player-2">
+      <div class="avatar">AI 2</div>
+      <div class="card-count">13 张</div>
+    </div>
+    <div class="ai-hand-back" id="hand-2"></div>
+  </div>
+
+  <!-- 左侧 AI 1 -->
+  <div class="left-area">
+    <div class="player-box" id="player-1">
+      <div class="avatar">AI 1</div>
+      <div class="card-count">13 张</div>
+    </div>
+    <div class="ai-hand-back" id="hand-1"></div>
+  </div>
+
+  <!-- 中心桌子 -->
+  <div class="center-area">
+    <div style="margin-bottom: 4px; font-size: 12px; color: #AE7645; font-weight: bold; text-shadow: 1px 1px 2px black;">
+        弃牌区 | 牌堆剩余: <span id="deckCount" style="color:#F59E0B">0</span>
+    </div>
+    <div class="discard-pile" id="discardPile"></div>
+  </div>
+
+  <!-- 右侧 AI 3 -->
+  <div class="right-area">
+    <div class="player-box" id="player-3">
+      <div class="avatar">AI 3</div>
+      <div class="card-count">13 张</div>
+    </div>
+    <div class="ai-hand-back" id="hand-3"></div>
+  </div>
+
+  <!-- 底部 玩家 -->
+  <div class="bottom-area">
+    <div class="action-bar">
+      <button class="btn btn-eat" id="eatBtn" onclick="handleEat()" style="display:none">吃牌</button>
+      <button class="btn btn-eat" id="confirmEatBtn" onclick="confirmEat()" style="display:none; background: linear-gradient(to bottom, #10B981, #059669);">确定吃牌</button>
+      <button class="btn btn-pass" id="cancelEatBtn" onclick="cancelEat()" style="display:none">取消</button>
+      <button class="btn btn-hu" id="huBtn" onclick="handleHu()" style="display:none">胡牌</button>
+      <button class="btn btn-pass" id="passBtn" onclick="handlePassAction()" style="display:none">过</button>
+    </div>
+    <div class="hand-container" id="userHand"></div>
+    <div class="player-box active-turn" id="player-0" style="margin-top:4px">
+      <div class="avatar">YOU</div>
+      <div class="card-count">13 张</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast">胡牌！</div>
+
+<div class="modal" id="resultModal">
+  <div class="modal-content">
+    <h2 id="resultTitle">游戏结束</h2>
+    <p id="resultMsg"></p>
+    <button class="btn btn-eat" onclick="location.reload()">再来一局</button>
+  </div>
+</div>
+
+<script>
+  // --- 牌面数据定义 ---
+  const CARD_DEFS = [
+    // value5: 核酸、DNA、RNA、核苷酸 (胡牌时的对子)
+    { val: 'value5', name: '核酸', img: '1-核酸（主视图）.png', count: 4 },
+    { val: 'value5', name: 'DNA', img: '2-DNA.png', count: 4 },
+    { val: 'value5', name: 'RNA', img: '2-RNA.png', count: 4 },
+    { val: 'value5', name: '核苷酸', img: '2-核苷酸.png', count: 4 },
+
+    // value4: 核糖核苷酸 (P-OH), 脱氧核糖核苷酸 (P-H) - 万能牌
+    { val: 'value4-P-OH', name: '核糖核苷酸', img: '3-核糖核苷酸.png', count: 4 },
+    { val: 'value4-P-H', name: '脱氧核糖核苷酸', img: '3-脱氧核糖核苷酸.png', count: 4 },
+
+    // value3: 各种核苷酸 (DNA: P-A-H, P-T-H, P-C-H, P-G-H; RNA: P-A-OH, P-U-OH, P-C-OH, P-G-OH)
+    { val: 'value3-P-A-H', name: 'dAMP', img: '4-A,DNA.png', count: 4 },
+    { val: 'value3-P-T-H', name: 'dTMP', img: '4-T,DNA.png', count: 4 },
+    { val: 'value3-P-C-H', name: 'dCMP', img: '4-C,DNA.png', count: 4 },
+    { val: 'value3-P-G-H', name: 'dGMP', img: '4-G,DNA.png', count: 4 },
+    { val: 'value3-P-A-OH', name: 'AMP', img: '4-A,RNA.png', count: 4 },
+    { val: 'value3-P-U-OH', name: 'UMP', img: '4-U,RNA.png', count: 4 },
+    { val: 'value3-P-C-OH', name: 'CMP', img: '4-C,RNA.png', count: 4 },
+    { val: 'value3-P-G-OH', name: 'GMP', img: '4-G,RNA.png', count: 4 },
+
+    // value2: 苷类 (A-H, T-H, C-H, G-H; A-OH, U-OH, C-OH, G-OH) 和 磷酸糖类 (P-OH, P-H)
+    { val: 'value2-A-H', name: '脱氧腺苷', img: '5-脱氧腺苷.png', count: 4 },
+    { val: 'value2-T-H', name: '脱氧胸苷', img: '5-脱氧胸苷.png', count: 4 },
+    { val: 'value2-C-H', name: '脱氧胞苷', img: '5-脱氧胞苷.png', count: 4 },
+    { val: 'value2-G-H', name: '脱氧鸟苷', img: '5-脱氧鸟苷.png', count: 4 },
+    { val: 'value2-A-OH', name: '腺苷', img: '5-腺苷.png', count: 4 },
+    { val: 'value2-U-OH', name: '尿苷', img: '5-尿苷.png', count: 4 },
+    { val: 'value2-C-OH', name: '胞苷', img: '5-胞苷.png', count: 4 },
+    { val: 'value2-G-OH', name: '鸟苷', img: '5-鸟苷.png', count: 4 },
+    { val: 'value2-P-OH', name: '磷酸核糖', img: '5-磷酸核糖.png', count: 4 },
+    { val: 'value2-P-H', name: '磷酸脱氧核糖', img: '5-磷酸脱氧核糖.png', count: 4 },
+
+    // value1: 碱基 (A, T, C, G, U), 糖 (OH, H), 磷酸 (P)
+    { val: 'value1-A', name: '腺嘌呤(A)', img: '5-A.png', count: 4 },
+    { val: 'value1-T', name: '胸腺嘧啶(T)', img: '5-T.png', count: 4 },
+    { val: 'value1-C', name: '胞嘧啶(C)', img: '5-C.png', count: 4 },
+    { val: 'value1-G', name: '鸟嘌呤(G)', img: '5-G.png', count: 4 },
+    { val: 'value1-U', name: '尿嘧啶(U)', img: '5-U.png', count: 4 },
+    { val: 'value1-OH', name: '核糖', img: '5-核糖.png', count: 4 },
+    { val: 'value1-H', name: '脱氧核糖', img: '5-脱氧核糖.png', count: 4 },
+    { val: 'value1-P', name: '磷酸', img: '5-磷酸.png', count: 4 }
+  ];
+
+  function getImgUrl(imgName) {
+      return `./麻将/${imgName}`;
+  }
+
+  let deck = [];
+  let players = [
+    { id: 0, name: '玩家', hand: [], exposed: [], discards: [], isAI: false },
+    { id: 1, name: 'AI 1', hand: [], exposed: [], discards: [], isAI: true },
+    { id: 2, name: 'AI 2', hand: [], exposed: [], discards: [], isAI: true },
+    { id: 3, name: 'AI 3', hand: [], exposed: [], discards: [], isAI: true }
+  ];
+  let currentPlayerIdx = 0;
+  let lastDiscard = null;
+  let gameState = 'IDLE'; 
+  let selectedIdx = -1;
+  let draggedIdx = -1; // 拖拽索引
+  let eatingCandidates = []; // 吃牌候选索引
+  let selectedEatIndices = []; // 已选吃牌索引
+
+  function initGame() {
+    deck = [];
+    CARD_DEFS.forEach(def => {
+      for(let i=0; i<def.count; i++) {
+        deck.push({...def, id: Math.random()});
+      }
+    });
+    shuffle(deck);
+    players.forEach(p => {
+      p.hand = deck.splice(0, 13);
+      sortHand(p.hand);
+    });
+    currentPlayerIdx = Math.floor(Math.random() * 4);
+    renderAll();
+    startTurn();
+  }
+
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  function sortHand(hand) {
+    hand.sort((a, b) => {
+        const vA = a.val.split('-')[0];
+        const vB = b.val.split('-')[0];
+        if (vA !== vB) return vB.localeCompare(vA); // value5 > value4 > ...
+        return a.name.localeCompare(b.name);
+    });
+  }
+
+  function checkHu(player) {
+    const fullHand = [...player.hand, ...player.exposed.flat()];
+    if (fullHand.length !== 14) return false;
+    
+    // 已经固定的牌组不需要再校验，只需要校验剩余手牌是否能组成 (N组 + 1对)
+    // 这里的逻辑简化为：校验全手牌是否符合胡牌规则
+    const hand = [...player.hand];
+    // ... 保持原有 checkHu 逻辑，但传入 hand 数组
+    return isHu(hand);
+  }
+
+  function isHu(hand) {
+    if (hand.length === 0) return true;
+
+    // 新增胡牌方式：全为1级牌中的同一种类（全磷酸、全五碳糖、全碱基）
+    const isAllLevel1Type = (cards) => {
+        if (cards.length !== 14) return false;
+        const firstCard = cards[0];
+        if (!firstCard.val.startsWith('value1')) return false;
+        
+        // 判定种类：P(磷酸), H/OH(糖), A/T/C/G/U(碱基)
+        const getLevel1Type = (c) => {
+            if (!c.val.startsWith('value1')) return null;
+            const type = c.val.split('-')[1];
+            if (type === 'P') return 'P';
+            if (['H', 'OH'].includes(type)) return 'Sugar';
+            if (['A', 'T', 'C', 'G', 'U'].includes(type)) return 'Base';
+            return null;
+        };
+
+        const targetType = getLevel1Type(firstCard);
+        if (!targetType) return false;
+
+        return cards.every(c => getLevel1Type(c) === targetType);
+    };
+
+    if (isAllLevel1Type(hand)) return true;
+
+    // 寻找对子
+    for (let i = 0; i < hand.length; i++) {
+      for (let j = i + 1; j < hand.length; j++) {
+        if (isPair(hand[i], hand[j])) {
+          let remaining = hand.filter((_, idx) => idx !== i && idx !== j);
+          if (canSplitIntoSets(remaining)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function isPair(c1, c2) {
+    // 必须是两个相同的 value5 牌
+    return c1.val === 'value5' && c2.val === 'value5' && c1.name === c2.name;
+  }
+
+  function canSplitIntoSets(cards) {
+    if (cards.length === 0) return true;
+    // 尝试将第一张牌与后面任意两张组合
+    for (let i = 1; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) {
+        if (isSet(cards[0], cards[i], cards[j])) {
+          let remaining = cards.filter((_, idx) => idx !== 0 && idx !== i && idx !== j);
+          if (canSplitIntoSets(remaining)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function isSet(c1, c2, c3, isEat = false) {
+    const group = [c1, c2, c3];
+    const names = group.map(c => c.name);
+    const vals = group.map(c => c.val);
+    
+    // 1. 三张完全一样的牌
+    if (names[0] === names[1] && names[1] === names[2]) {
+        // 如果是吃牌操作，不允许选择三个相同的牌
+        if (isEat) return false;
+        return true;
+    }
+    
+    // 2. value1 的三种牌可以为一组 (P + 糖 + 碱基)
+    const v1s = group.filter(c => c.val.startsWith('value1'));
+    if (v1s.length === 3) {
+        const hasP = v1s.some(c => c.val === 'value1-P');
+        const hasSugarH = v1s.some(c => c.val === 'value1-H');
+        const hasSugarOH = v1s.some(c => c.val === 'value1-OH');
+        const hasBase = v1s.some(c => ['value1-A','value1-T','value1-C','value1-G','value1-U'].includes(c.val));
+        
+        if (hasP && hasBase) {
+            if (hasSugarH && !v1s.some(c => c.val === 'value1-U')) return true; // DNA组
+            if (hasSugarOH && !v1s.some(c => c.val === 'value1-T')) return true; // RNA组
+        }
+    }
+
+    // 3. 互补配对逻辑
+    // 辅助函数：解析牌的属性
+    const parseAttr = (c) => {
+        const parts = c.val.split('-');
+        const valType = parts[0]; // value1, value2, value3, value4
+        
+        let sugar = null;
+        let base = null;
+        let hasP = false;
+
+        if (valType === 'value4') {
+            hasP = true;
+            sugar = parts[2]; // H or OH
+        } else if (valType === 'value3') {
+            hasP = true;
+            base = parts[2];
+            sugar = parts[3];
+        } else if (valType === 'value2') {
+            if (parts[1] === 'P') {
+                hasP = true;
+                sugar = parts[2];
+            } else {
+                base = parts[1];
+                sugar = parts[2];
+            }
+        } else if (valType === 'value1') {
+            if (parts[1] === 'P') hasP = true;
+            else if (['H', 'OH'].includes(parts[1])) sugar = parts[1];
+            else base = parts[1];
+        }
+
+        return { valType, sugar, base, hasP };
+    };
+
+    const pairMap = { 'A': ['T', 'U'], 'T': ['A'], 'U': ['A'], 'C': ['G'], 'G': ['C'] };
+
+    // 规则：value1-P + value2-Base-Sugar + value3-P-Base-Sugar (磷酸 + 苷 + 互补核苷酸)
+    // 规则：value1-Base + value2-P-Sugar + value3-P-Base-Sugar (碱基 + 磷酸糖 + 互补核苷酸)
+    
+    let comp1 = group.find(c => c.val.startsWith('value1'));
+    let comp2 = group.find(c => c.val.startsWith('value2'));
+    let comp3 = group.find(c => c.val.startsWith('value3') || c.val.startsWith('value4'));
+
+    if (comp1 && comp2 && comp3) {
+        const a1 = parseAttr(comp1);
+        const a2 = parseAttr(comp2);
+        const a3 = parseAttr(comp3);
+
+        // 糖类型必须一致 (H/OH)
+        if (a2.sugar !== a3.sugar) return false;
+
+        // 万能牌处理 (value4)
+        if (a3.valType === 'value4') {
+            // 情况 A: value1-P + value2-Base-Sugar + value4-P-Sugar
+            if (a1.hasP && a2.base) return true;
+            // 情况 B: value1-Base + value2-P-Sugar + value4-P-Sugar
+            if (a1.base && a2.hasP) return true;
+        }
+
+        // 情况 A: value1-P + value2-BaseA-Sugar + value3-P-BaseB-Sugar
+        if (a1.hasP && a2.base && a3.base) {
+            if (pairMap[a2.base] && pairMap[a2.base].includes(a3.base)) return true;
+        }
+
+        // 情况 B: value1-BaseA + value2-P-Sugar + value3-P-BaseB-Sugar
+        if (a1.base && a2.hasP && a3.base) {
+            if (pairMap[a1.base] && pairMap[a1.base].includes(a3.base)) return true;
+        }
+    }
+    
+    return false;
+  }
+
+  function getCardType(card) {
+    const n = card.name;
+    // DNA 判定标识
+    if (n.includes('DNA') || n.includes('脱氧') || n === 'T' || n.includes('胸苷')) return 'DNA';
+    // RNA 判定标识
+    if (n.includes('RNA') || (n.includes('核糖') && !n.includes('脱氧')) || n === 'U' || n.includes('尿苷') || n.includes('腺苷') || n.includes('胞苷') || n.includes('鸟苷')) return 'RNA';
+    // 通用标识 (磷酸, A, C, G 等)
+    return 'Both';
+  }
+
+  function startTurn() {
+    updateTurnUI();
+    const p = players[currentPlayerIdx];
+    if (deck.length === 0) {
+        showResult('平局', '牌堆已空，大家都是核酸专家！');
+        return;
+    }
+    const newCard = deck.pop();
+    p.hand.push(newCard);
+    gameState = 'DRAWN';
+    renderAll();
+    if (p.isAI) {
+      setTimeout(() => aiAction(p), 1000);
+    } else {
+      if (isHu(p.hand)) document.getElementById('huBtn').style.display = 'block';
+    }
+  }
+
+  function discard(cardIdx) {
+    const p = players[currentPlayerIdx];
+    lastDiscard = p.hand.splice(cardIdx, 1)[0];
+    if (p.isAI) sortHand(p.hand); // 仅 AI 自动排序，玩家保持手动顺序
+    gameState = 'WAITING_ACTION';
+    const discardEl = document.createElement('div');
+    discardEl.className = 'discard-tile';
+    discardEl.style.backgroundImage = `url(${getImgUrl(lastDiscard.img)})`;
+    discardEl.setAttribute('data-val', lastDiscard.val.split('-')[0]);
+    document.getElementById('discardPile').appendChild(discardEl);
+    renderAll();
+    checkOtherPlayersAction();
+  }
+
+  function checkOtherPlayersAction() {
+    // 检查胡牌：除出牌者外的所有玩家
+    for (let i = 0; i < 4; i++) {
+        if (i === currentPlayerIdx) continue;
+        const p = players[i];
+        const tempHand = [...p.hand, lastDiscard];
+        if (isHu(tempHand)) {
+            if (p.isAI) {
+                showToast(`${p.name} 胡了！`);
+                showResult(`${p.name} 获胜`, 'AI 率先完成了核酸配对！');
+                return;
+            } else {
+                document.getElementById('huBtn').style.display = 'block';
+                document.getElementById('passBtn').style.display = 'block';
+                // 玩家可以选择胡牌或过，暂时中断流程
+                return;
+            }
+        }
+    }
+
+    // 检查吃牌：仅下家
+    const nextIdx = (currentPlayerIdx + 1) % 4;
+    const nextPlayer = players[nextIdx];
+    let canEat = false;
+    if (!nextPlayer.isAI) {
+        for(let i=0; i<nextPlayer.hand.length; i++) {
+            for(let j=i+1; j<nextPlayer.hand.length; j++) {
+                if(isSet(lastDiscard, nextPlayer.hand[i], nextPlayer.hand[j], true)) {
+                    canEat = true;
+                    break;
+                }
+            }
+        }
+    }
+    if (canEat) {
+        document.getElementById('eatBtn').style.display = 'block';
+        document.getElementById('passBtn').style.display = 'block';
+    } else {
+        setTimeout(nextTurn, 600);
+    }
+  }
+
+  function nextTurn() {
+    document.getElementById('eatBtn').style.display = 'none';
+    document.getElementById('huBtn').style.display = 'none';
+    document.getElementById('passBtn').style.display = 'none';
+    currentPlayerIdx = (currentPlayerIdx + 1) % 4;
+    startTurn();
+  }
+
+  function handleTileClick(idx) {
+    // 允许在吃牌选择阶段点击，即使当前不是玩家的回合（因为吃牌是对他人弃牌的响应）
+    if (currentPlayerIdx !== 0 && gameState !== 'EATING_SELECTING') return;
+
+    if (gameState === 'EATING_SELECTING') {
+        handleEatSelection(idx);
+        return;
+    }
+
+    if (gameState !== 'DRAWN') return;
+    
+    if (selectedIdx === idx) {
+        discard(idx);
+        selectedIdx = -1;
+    } else {
+        selectedIdx = idx;
+        renderUserHand();
+    }
+  }
+
+  function handleEat() {
+    gameState = 'EATING_SELECTING';
+    selectedEatIndices = [];
+    calculateEatingCandidates();
+    
+    document.getElementById('eatBtn').style.display = 'none';
+    document.getElementById('passBtn').style.display = 'none';
+    document.getElementById('cancelEatBtn').style.display = 'block';
+    document.getElementById('confirmEatBtn').style.display = 'none';
+    
+    showToast('请选择两张牌进行吃牌');
+    renderUserHand();
+  }
+
+  function calculateEatingCandidates() {
+    const p = players[0];
+    eatingCandidates = [];
+    
+    if (selectedEatIndices.length === 0) {
+        // 初始候选：能与 lastDiscard 和手牌中另一张组成一组的牌
+        for (let i = 0; i < p.hand.length; i++) {
+            for (let j = 0; j < p.hand.length; j++) {
+                if (i === j) continue;
+                if (isSet(lastDiscard, p.hand[i], p.hand[j], true)) {
+                    eatingCandidates.push(i);
+                    break;
+                }
+            }
+        }
+    } else if (selectedEatIndices.length === 1) {
+        // 已选一张：能与 lastDiscard 和已选牌组成一组的牌
+        const firstIdx = selectedEatIndices[0];
+        
+        // 关键：已选中的牌本身也应该是“候选”，否则在 render 时会被判定为 disabled
+        eatingCandidates.push(firstIdx); 
+        
+        for (let i = 0; i < p.hand.length; i++) {
+            if (i === firstIdx) continue;
+            if (isSet(lastDiscard, p.hand[firstIdx], p.hand[i], true)) {
+                eatingCandidates.push(i);
+            }
+        }
+    } else if (selectedEatIndices.length === 2) {
+        // 已选两张：这两张都是候选，确保它们保持高亮且可点击（用于取消选择）
+        eatingCandidates = [...selectedEatIndices];
+    }
+  }
+
+  function handleEatSelection(idx) {
+    const sIdx = selectedEatIndices.indexOf(idx);
+    if (sIdx !== -1) {
+        // 取消选择
+        selectedEatIndices.splice(sIdx, 1);
+    } else {
+        // 尝试选择
+        if (eatingCandidates.includes(idx) && selectedEatIndices.length < 2) {
+            selectedEatIndices.push(idx);
+        }
+    }
+    
+    // 重新计算候选牌，以确保第二张牌的选择逻辑正确
+    calculateEatingCandidates();
+    
+    // 强制重新渲染手牌，确保视觉反馈即时更新
+    renderUserHand();
+    
+    // 显示/隐藏确定按钮
+    document.getElementById('confirmEatBtn').style.display = 
+        selectedEatIndices.length === 2 ? 'block' : 'none';
+  }
+
+  function confirmEat() {
+    if (selectedEatIndices.length !== 2) return;
+    
+    const p = players[0];
+    // 必须先排降序，防止删除时索引错乱
+    selectedEatIndices.sort((a, b) => b - a);
+    
+    const card1 = p.hand.splice(selectedEatIndices[0], 1)[0];
+    const card2 = p.hand.splice(selectedEatIndices[1], 1)[0];
+    
+    p.exposed.push([lastDiscard, card1, card2]);
+
+    // 从弃牌区移除最后一张
+    const pile = document.getElementById('discardPile');
+    if (pile.lastChild) pile.removeChild(pile.lastChild);
+
+    currentPlayerIdx = 0;
+    gameState = 'DRAWN'; 
+    selectedEatIndices = [];
+    eatingCandidates = [];
+    
+    document.getElementById('confirmEatBtn').style.display = 'none';
+    document.getElementById('cancelEatBtn').style.display = 'none';
+    
+    renderAll();
+    showToast('吃牌成功！请出一张牌');
+  }
+
+  function handleEatSelection(idx) {
+    const sIdx = selectedEatIndices.indexOf(idx);
+    if (sIdx !== -1) {
+        // 取消选择
+        selectedEatIndices.splice(sIdx, 1);
+    } else {
+        // 尝试选择
+        if (eatingCandidates.includes(idx) && selectedEatIndices.length < 2) {
+            selectedEatIndices.push(idx);
+        }
+    }
+    
+    // 重新计算候选牌，以确保第二张牌的选择逻辑正确
+    calculateEatingCandidates();
+    
+    // 强制重新渲染手牌，确保视觉反馈即时更新
+    renderUserHand();
+    
+    // 显示/隐藏确定按钮
+    document.getElementById('confirmEatBtn').style.display = 
+        selectedEatIndices.length === 2 ? 'block' : 'none';
+  }
+
+  function confirmEat() {
+    if (selectedEatIndices.length !== 2) return;
+    
+    const p = players[0];
+    // 必须先排降序，防止删除时索引错乱
+    selectedEatIndices.sort((a, b) => b - a);
+    
+    const card1 = p.hand.splice(selectedEatIndices[0], 1)[0];
+    const card2 = p.hand.splice(selectedEatIndices[1], 1)[0];
+    
+    p.exposed.push([lastDiscard, card1, card2]);
+
+    // 从弃牌区移除最后一张
+    const pile = document.getElementById('discardPile');
+    if (pile.lastChild) pile.removeChild(pile.lastChild);
+
+    currentPlayerIdx = 0;
+    gameState = 'DRAWN'; 
+    selectedEatIndices = [];
+    eatingCandidates = [];
+    
+    document.getElementById('confirmEatBtn').style.display = 'none';
+    document.getElementById('cancelEatBtn').style.display = 'none';
+    
+    renderAll();
+    showToast('吃牌成功！请出一张牌');
+  }
+
+  function cancelEat() {
+    gameState = 'WAITING_ACTION';
+    selectedEatIndices = [];
+    eatingCandidates = [];
+    document.getElementById('cancelEatBtn').style.display = 'none';
+    document.getElementById('confirmEatBtn').style.display = 'none';
+    
+    // 恢复吃牌和过按钮
+    document.getElementById('eatBtn').style.display = 'block';
+    document.getElementById('passBtn').style.display = 'block';
+    
+    renderUserHand();
+  }
+
+  function handleHu() {
+    showToast('胡牌！');
+    showResult('你赢了！', '恭喜你成功凑齐了14张核酸相关卡牌，完成了生命密码的组装！');
+  }
+
+  function handlePassAction() { nextTurn(); }
+
+  function aiAction(p) {
+    if (isHu(p.hand)) {
+        showToast(`${p.name} 胡了！`);
+        showResult(`${p.name} 获胜`, 'AI 率先完成了核酸配对！');
+        return;
+    }
+    
+    // 智能出牌逻辑：保留已配对 > 差一张 > 散牌
+    let bestDiscardIdx = -1;
+    let minPriority = 100;
+
+    // 统计 value5 牌的数量
+    const v5Cards = p.hand.filter(c => c.val === 'value5');
+    const v5Counts = {};
+    v5Cards.forEach(c => {
+        v5Counts[c.name] = (v5Counts[c.name] || 0) + 1;
+    });
+    const hasV5Pair = Object.values(v5Counts).some(count => count >= 2);
+
+    // 评估每张牌的重要性
+    for (let i = 0; i < p.hand.length; i++) {
+        let priority = 4; // 默认散牌优先级
+        const currentCard = p.hand[i];
+        const otherCards = p.hand.filter((_, idx) => idx !== i);
+
+        // 特殊规则：value5 优先级处理
+        if (currentCard.val === 'value5') {
+            if (hasV5Pair) {
+                // 如果已经有对子了，除了对子以外的 value5 变成散牌优先级
+                if (v5Counts[currentCard.name] < 2) {
+                    priority = 4;
+                } else {
+                    // 对子中的一张，保留
+                    priority = 1;
+                }
+            } else {
+                // 还没有对子，极力保留所有 value5
+                priority = 0; 
+            }
+        } else {
+            // 1. 检查是否属于已配对的三张一组 (优先级 1)
+            let inSet = false;
+            for (let j = 0; j < otherCards.length; j++) {
+                for (let k = j + 1; k < otherCards.length; k++) {
+                    if (isSet(currentCard, otherCards[j], otherCards[k])) {
+                        inSet = true;
+                        break;
+                    }
+                }
+                if (inSet) break;
+            }
+            if (inSet) priority = 1;
+
+            // 2. 检查是否属于差一张的两张组合 (优先级 2)
+            if (priority > 1) {
+                let inPotentialSet = false;
+                for (const def of CARD_DEFS) {
+                    for(let m=0; m<otherCards.length; m++) {
+                        if(isSet(currentCard, otherCards[m], def)) {
+                            inPotentialSet = true;
+                            break;
+                        }
+                    }
+                    if(inPotentialSet) break;
+                }
+                if (inPotentialSet) priority = 2;
+            }
+        }
+
+        // 优先出优先级数值最大的牌（最不重要的牌）
+        if (priority >= minPriority) {
+            if (priority > minPriority || Math.random() > 0.5) {
+                minPriority = priority;
+                bestDiscardIdx = i;
+            }
+        } else if (bestDiscardIdx === -1) {
+            minPriority = priority;
+            bestDiscardIdx = i;
+        }
+    }
+
+    if (bestDiscardIdx === -1) bestDiscardIdx = Math.floor(Math.random() * p.hand.length);
+    
+    discard(bestDiscardIdx);
+  }
+
+  function renderAll() {
+    renderUserHand();
+    renderAIHands();
+    updateTurnUI();
+    document.getElementById('deckCount').textContent = deck.length;
+  }
+
+  function renderUserHand() {
+    const container = document.getElementById('userHand');
+    container.innerHTML = '';
+    
+    // 渲染普通手牌
+    const handDiv = document.createElement('div');
+    handDiv.style.display = 'flex';
+    handDiv.style.gap = '2px';
+    players[0].hand.forEach((card, i) => {
+      const div = document.createElement('div');
+      
+      let className = 'pai-tile';
+      if (gameState === 'EATING_SELECTING') {
+          if (selectedEatIndices.includes(i)) {
+              className += ' eat-selected';
+          } else if (eatingCandidates.includes(i)) {
+              className += ' candidate';
+          } else {
+              className += ' disabled';
+          }
+      } else {
+          if (selectedIdx === i) className += ' selected';
+      }
+      
+      div.className = className;
+      div.draggable = gameState === 'DRAWN'; // 仅在出牌阶段允许拖拽
+      div.style.backgroundImage = `url(${getImgUrl(card.img)})`;
+      
+      // 点击事件
+      div.onclick = () => handleTileClick(i);
+      
+      // 拖拽事件
+      div.ondragstart = (e) => {
+          draggedIdx = i;
+          e.dataTransfer.effectAllowed = 'move';
+          setTimeout(() => div.style.opacity = '0.4', 0);
+      };
+      div.ondragend = () => {
+          div.style.opacity = '1';
+          draggedIdx = -1;
+      };
+      div.ondragover = (e) => e.preventDefault();
+      div.ondrop = (e) => {
+          e.preventDefault();
+          if (draggedIdx !== -1 && draggedIdx !== i) {
+              const p = players[0];
+              const movedCard = p.hand.splice(draggedIdx, 1)[0];
+              p.hand.splice(i, 0, movedCard);
+              renderUserHand();
+          }
+      };
+
+      handDiv.appendChild(div);
+    });
+    container.appendChild(handDiv);
+
+    // 渲染固定牌组 (副露)
+    if (players[0].exposed.length > 0) {
+      players[0].exposed.forEach(group => {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'exposed-group';
+        group.forEach(card => {
+          const div = document.createElement('div');
+          div.className = 'pai-tile';
+          div.style.cursor = 'default';
+          div.style.opacity = '0.9';
+          div.style.backgroundImage = `url(${getImgUrl(card.img)})`;
+          groupDiv.appendChild(div);
+        });
+        container.appendChild(groupDiv);
+      });
+    }
+
+    const totalCount = players[0].hand.length + players[0].exposed.length * 3;
+    document.querySelector('#player-0 .card-count').textContent = `${totalCount} 张`;
+  }
+
+  function renderAIHands() {
+    for(let i=1; i<=3; i++) {
+        const container = document.getElementById(`hand-${i}`);
+        container.innerHTML = '';
+        players[i].hand.forEach(() => {
+            const div = document.createElement('div');
+            div.className = 'tile-back';
+            container.appendChild(div);
+        });
+        document.querySelector(`#player-${i} .card-count`).textContent = `${players[i].hand.length} 张`;
+    }
+  }
+
+  function updateTurnUI() {
+    const activeBox = document.querySelector('.player-box.active-turn');
+    const targetBox = document.getElementById(`player-${currentPlayerIdx}`);
+    if (activeBox !== targetBox) {
+      if (activeBox) activeBox.classList.remove('active-turn');
+      if (targetBox) targetBox.classList.add('active-turn');
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2000);
+  }
+
+  function showResult(title, msg) {
+    document.getElementById('resultTitle').textContent = title;
+    document.getElementById('resultMsg').textContent = msg;
+    document.getElementById('resultModal').style.display = 'flex';
+  }
+
+  window.onload = initGame;
+</script>
+
+</body>
+</html>
